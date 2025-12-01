@@ -16,16 +16,20 @@ struct EventHeader {
   struct timespec time;
 };
 
-struct PingEvent {};
+struct PingEvent {
+  struct EventHeader hdr;
+};
 
-struct AckEvent {};
+struct AckEvent {
+  struct EventHeader hdr;
+};
 
 struct Event {
-  struct EventHeader hdr;
   union {
+    struct EventHeader hdr;
     struct PingEvent ping;
     struct AckEvent ack;
-  } body;
+  };
 };
 
 typedef struct Event Event;

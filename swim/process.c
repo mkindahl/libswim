@@ -20,15 +20,17 @@
 
 static void swim_process_ping(SWIM *swim, Event *event, struct sockaddr *addr,
                               socklen_t addrlen) {
-  struct PingEvent *ping = &event->body.ping;
+  struct PingEvent *ping = &event->ping;
   TRACE("sending ping");
   size_t bytes =
       swim_send_packet(swim, event, sizeof(struct AckEvent), addr, addrlen);
 }
 
-static void swim_process_ack(SWIM *swim, Event *event, struct sockaddr *addr,
-                             socklen_t addrlen) {
-  struct AckEvent *ack = &event->body.ack;
+static void swim_process_ack(__attribute__((__unused__)) SWIM *swim,
+                             Event *event,
+                             __attribute__((__unused__)) struct sockaddr *addr,
+                             __attribute__((__unused__)) socklen_t addrlen) {
+  struct AckEvent *ack = &event->ack;
   TRACE("processing ack");
 }
 
