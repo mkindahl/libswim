@@ -11,6 +11,8 @@
 typedef enum EventType {
   EVENT_TYPE_PING,
   EVENT_TYPE_ACK,
+  EVENT_TYPE_JOIN,
+  EVENT_TYPE_LEAVE,
 } EventType;
 
 /*
@@ -35,11 +37,23 @@ typedef struct EventHeader {
 } EventHeader;
 
 struct PingEvent {
-  struct EventHeader hdr;
+  EventHeader hdr;
 };
 
 struct AckEvent {
-  struct EventHeader hdr;
+  EventHeader hdr;
+};
+
+struct JoinEvent {
+  EventHeader hdr;
+  uuid_t join_uuid;
+  socklen_t join_addrlen;
+  struct sockaddr_storage join_addr;
+};
+
+struct LeaveEvent {
+  EventHeader hdr;
+  uuid_t leave_uuid;
 };
 
 typedef struct Instance {
@@ -50,9 +64,11 @@ typedef struct Instance {
 
 typedef struct Event {
   union {
-    struct EventHeader hdr;
+    EventHeader hdr;
     struct PingEvent ping;
     struct AckEvent ack;
+    struct JoinEvent join;
+    struct LeaveEvent leave;
   };
   size_t gossip_count;
   Instance gossip_instances[];

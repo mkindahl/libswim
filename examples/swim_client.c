@@ -11,10 +11,10 @@
 #include "swim/swim.h"
 
 #include <arpa/inet.h>
+#include <bits/time.h>
 #include <netinet/in.h>
 
 #define BUFSIZE 1024
-#define SWIM_PORTNO 7946
 
 #define STR(X) EXPAND(X)
 #define EXPAND(X) #X
@@ -26,18 +26,19 @@
 
 int main(int argc, char **argv) {
   Event event;
-  int sockfd, portno, err;
+  int sockfd, err;
   ssize_t bytes;
   struct sockaddr_storage serveraddr;
   socklen_t serverlen = sizeof(serveraddr);
-  char hostname[NI_MAXHOST], service[NI_MAXSERV];
+  char hostname[NI_MAXHOST];
+  char service[NI_MAXSERV];
   char buf[BUFSIZE];
   char str[BUFSIZE];
   struct addrinfo hints;
   struct addrinfo *result;
 
   /* check command line arguments */
-  if (argc != 3) {
+  if (argc < 3) {
     fprintf(stderr, "usage: %s <hostname> <event>\n", argv[0]);
     exit(0);
   }
@@ -48,7 +49,7 @@ int main(int argc, char **argv) {
   hints.ai_flags = AI_NUMERICSERV; /* Numeric server */
   hints.ai_protocol = 0;           /* Any protocol */
 
-  err = getaddrinfo(argv[1], STR(SWIM_PORTNO), &hints, &result);
+  err = getaddrinfo(argv[1], STR(SWIM_DEFAULT_PORTNO), &hints, &result);
   if (err != 0) {
     fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
     exit(EXIT_FAILURE);
@@ -78,16 +79,31 @@ int main(int argc, char **argv) {
     event.hdr.type = EVENT_TYPE_PING;
   } else if (strcmp(argv[2], "ack") == 0) {
     event.hdr.type = EVENT_TYPE_ACK;
+  } else if (strcmp(argv[2], "join") == 0) {
+    event.hdr.type = EVENT_TYPE_JOIN;
+    if (argc > 3)
+      uuid_parse(argv[3], event.join.join_uuid);
+    else {
+      fprintf(stderr, "need a UUID\n");
+      exit(EXIT_FAILURE);
+    }
+  } else if (strcmp(argv[2], "leave") == 0) {
+    event.hdr.type = EVENT_TYPE_LEAVE;
+    if (argc > 3)
+      uuid_parse(argv[3], event.leave.leave_uuid);
+    else {
+      fprintf(stderr, "need a UUID\n");
+      exit(EXIT_FAILURE);
+    }
   } else {
     fprintf(stderr, "ERROR, no such host as %s\n", hostname);
     exit(EXIT_FAILURE);
   }
 
-  clock_gettime(CLOCK_MONOTONIC, &event.hdr.time);
+  clock_gettime(CLOCK_REALTIME, &event.hdr.time);
+
   uuid_generate(event.hdr.uuid);
 
-  /* send the message to the server */
-  TRACE("sending event");
   bytes = sendto(sockfd, &event, sizeof(event), 0,
                  (struct sockaddr *)&serveraddr, serverlen);
   if (bytes < 0) {
@@ -96,9 +112,9 @@ int main(int argc, char **argv) {
   }
 
   /* Wait and read the server's reply if we sent a ping */
-  if (event.hdr.type == EVENT_TYPE_PING) {
-    TRACE("waiting for response");
-    bytes = recv(sockfd, buf, strlen(buf), 0);
+  if (event.hdr.type == EVENT_TYPE_PING || event.hdr.type == EVENT_TYPE_JOIN ||
+      event.hdr.type == EVENT_TYPE_LEAVE) {
+    bytes = recv(sockfd, buf, sizeof(buf), 0);
     if (bytes < 0) {
       perror("recv");
       exit(EXIT_FAILURE);

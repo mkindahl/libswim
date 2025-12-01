@@ -18,6 +18,12 @@ bool swim_event_string(Event* event, char* buf, size_t buflen) {
     case EVENT_TYPE_ACK:
       ptr += sprintf(ptr, "ack from ");
       break;
+    case EVENT_TYPE_JOIN:
+      ptr += sprintf(ptr, "join from ");
+      break;
+    case EVENT_TYPE_LEAVE:
+      ptr += sprintf(ptr, "leave from ");
+      break;
     default:
       return false;
   }

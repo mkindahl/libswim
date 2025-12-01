@@ -19,28 +19,20 @@
 
 #define BUFSIZE 1024
 
-int main(int argc, char **argv) {
+int main(__attribute__((__unused__)) int argc,
+         __attribute__((__unused__)) char **argv) {
   SWIM swim;
   char buf[BUFSIZE];
-  struct sockaddr_storage clientaddr;
+  struct sockaddr_storage addr_storage;
+  struct sockaddr *addr = (struct sockaddr *)&addr_storage;
+  socklen_t addrlen = sizeof(addr_storage);
 
   swim_state_init(&swim, SWIM_DEFAULT_PORTNO);
 
   while (1) {
     Event *event = (Event *)buf;
-    size_t bytes;
-    const char *hostaddrp;
-
-    bytes =
-        swim_recv_packet(&swim, buf, sizeof(buf),
-                         (struct sockaddr *)&clientaddr, sizeof(clientaddr));
-    hostaddrp = inet_ntoa(clientaddr.sin_addr);
-    if (hostaddrp == NULL) {
-      perror("inet_ntoa");
-      exit(1);
-    }
-
-    swim_process_event(&swim, event, bytes, (struct sockaddr *)&clientaddr,
-                       sizeof(clientaddr));
+    size_t bytes = swim_recv_packet(&swim, buf, sizeof(buf), addr, addrlen);
+    swim_process_event(&swim, event, bytes, addr, addrlen);
+    swim_state_print(&swim);
   }
 }
