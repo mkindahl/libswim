@@ -9,6 +9,7 @@
 #include <sys/types.h>
 
 #include "swim/event.h"
+#include "swim/network.h"
 #include "swim/swim.h"
 
 #include <arpa/inet.h>
@@ -22,14 +23,12 @@
     fprintf(stderr, "%s: " MSG "\n", __func__, ##__VA_ARGS__); \
   } while (0)
 
-size_t send_packet(int, void *, size_t, struct sockaddr *, socklen_t);
-
 void swim_process_ping(SWIM *swim, Event *event, struct sockaddr *addr,
                        socklen_t addrlen) {
   struct PingEvent *ping = &event->body.ping;
   TRACE("sending ping");
   size_t bytes =
-      send_packet(swim->sockfd, event, sizeof(struct AckEvent), addr, addrlen);
+      swim_send_packet(swim, event, sizeof(struct AckEvent), addr, addrlen);
 }
 
 void swim_process_ack(SWIM *swim, Event *event, struct sockaddr *addr,
@@ -105,16 +104,6 @@ void swim_event_process(SWIM *swim, Event *event, size_t bytes,
   (*info->callback)(swim, event, addr, addrlen);
 }
 
-size_t recv_packet(int fd, char *buf, size_t buflen, struct sockaddr *addr,
-                   socklen_t addrlen) {
-  return recvfrom(fd, buf, buflen, 0, addr, &addrlen);
-}
-
-size_t send_packet(int fd, void *buf, size_t buflen, struct sockaddr *addr,
-                   socklen_t addrlen) {
-  return sendto(fd, buf, buflen, 0, addr, addrlen);
-}
-
 int main(int argc, char **argv) {
   SWIM swim;
   char buf[BUFSIZE];
@@ -127,9 +116,9 @@ int main(int argc, char **argv) {
     size_t bytes;
     const char *hostaddrp;
 
-    TRACE("waiting for packet");
-    bytes = recv_packet(swim.sockfd, buf, sizeof(buf),
-                        (struct sockaddr *)&clientaddr, sizeof(clientaddr));
+    bytes =
+        swim_recv_packet(&swim, buf, sizeof(buf),
+                         (struct sockaddr *)&clientaddr, sizeof(clientaddr));
     hostaddrp = inet_ntoa(clientaddr.sin_addr);
     if (hostaddrp == NULL) {
       perror("inet_ntoa");
