@@ -5,17 +5,8 @@
 #include <stdint.h>
 
 #include "swim/defs.h"
+#include "swim/state.h"
 
 #include <netinet/in.h>
-
-struct SWIM {
-  int sockfd;
-  union {
-    struct sockaddr_in ip4;
-    struct sockaddr_in6 ip6;
-  } addr;
-};
-
-typedef struct SWIM SWIM;
 
 #endif /* LIBSWIM_SWIM_H_ */
