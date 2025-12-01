@@ -1,0 +1,6 @@
+#ifndef SWIM_CONFIG_H_
+#define SWIM_CONFIG_H_
+
+#cmakedefine SWIM_TRACING
+
+#endif /* SWIM_CONFIG_H_ */

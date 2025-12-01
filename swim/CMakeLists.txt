@@ -1,3 +1,7 @@
+option(SWIM_TRACING "Include code to trace SWIM event processing" ON)
+
+configure_file(config.h.in config.h @ONLY)
+
 add_library(swim SHARED event.c network.c)
 
 set_target_properties(swim PROPERTIES

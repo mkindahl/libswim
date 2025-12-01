@@ -1,7 +1,10 @@
 #ifndef LIBSWIM_SWIM_H_
 #define LIBSWIM_SWIM_H_
 
-#include "event.h"
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "swim/defs.h"
 
 #include <netinet/in.h>
 

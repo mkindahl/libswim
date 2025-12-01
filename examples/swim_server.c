@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include "swim/debug.h"
 #include "swim/event.h"
 #include "swim/network.h"
 #include "swim/swim.h"
@@ -16,12 +17,6 @@
 #include <netinet/in.h>
 
 #define BUFSIZE 1024
-#define SWIM_PORTNO 7946
-
-#define TRACE(MSG, ...)                                        \
-  do {                                                         \
-    fprintf(stderr, "%s: " MSG "\n", __func__, ##__VA_ARGS__); \
-  } while (0)
 
 void swim_process_ping(SWIM *swim, Event *event, struct sockaddr *addr,
                        socklen_t addrlen) {
@@ -109,7 +104,7 @@ int main(int argc, char **argv) {
   char buf[BUFSIZE];
   struct sockaddr_storage clientaddr;
 
-  swim_state_init(&swim, SWIM_PORTNO);
+  swim_state_init(&swim, SWIM_DEFAULT_PORTNO);
 
   while (1) {
     Event *event = (Event *)buf;
