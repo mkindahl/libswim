@@ -10,6 +10,7 @@
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <sys/socket.h>
 
@@ -33,33 +34,52 @@ static void swim_process_ack(__attribute__((__unused__)) SWIM *swim,
                              __attribute__((__unused__)) struct sockaddr *addr,
                              __attribute__((__unused__)) socklen_t addrlen) {}
 
+/*
+ * Process the reception of an JOIN message.
+ *
+ * When a request to join the cluster is made, we update the cluster
+ * information with the new server and send an ACK message to the
+ * sender containing partial cluster gossip.
+ *
+ * The sender can ignore the ACK message if they want and will get
+ * gossip information messages later.
+ */
 static void swim_process_join(SWIM *swim, Event *event, struct sockaddr *addr,
                               socklen_t addrlen) {
   struct JoinEvent *join = &event->join;
-  Instance instance = {
+  InstanceData instance = {
       .last_seen = event->hdr.time,
       .status = SWIM_STATUS_ALIVE,
   };
 
-  uuid_copy(instance.uuid, join->joining_uuid);
-  swim_state_add_instance(swim, &instance);
-
+  uuid_copy(instance.uuid, join->join_uuid);
+  swim_state_add(swim, &instance, addr, addrlen);
   swim_send_ack(swim, addr, addrlen);
 }
 
+/*
+ * Process the reception of an LEAVE message.
+ *
+ * When a request to leave the cluster is made, we mark the server and
+ * declared dead and send an ack message (with gossip) to the server.
+ *
+ * The sender can ignore the ACK message if they want, but will not
+ * receive any other gossip messages unless the LEAVE message was
+ * lost.
+ */
 static void swim_process_leave(SWIM *swim, Event *event, struct sockaddr *addr,
                                socklen_t addrlen) {
   struct LeaveEvent *leave = &event->leave;
 
-  swim_state_del_instance(swim, leave->leaving_uuid);
+  swim_state_del(swim, leave->leave_uuid);
   swim_send_ack(swim, addr, addrlen);
 }
 
-struct EventInfo {
+typedef struct EventInfo {
   const char *name;
   void (*callback)(SWIM *swim, Event *event, struct sockaddr *addr,
                    socklen_t addrlen);
-};
+} EventInfo;
 
 static struct EventInfo swim_event_processing[] = {
     [EVENT_TYPE_PING] = {.name = "PING", .callback = swim_process_ping},
@@ -70,8 +90,9 @@ static struct EventInfo swim_event_processing[] = {
 
 void swim_process_event(SWIM *swim, Event *event, size_t bytes,
                         struct sockaddr *addr, socklen_t addrlen) {
-  char host[NI_MAXHOST], service[NI_MAXSERV];
-  struct EventInfo *info = &swim_event_processing[event->hdr.type];
+  char host[NI_MAXHOST];
+  char service[NI_MAXSERV];
+  EventInfo *info = &swim_event_processing[event->hdr.type];
   int s = getnameinfo(addr, addrlen, host, NI_MAXHOST, service, NI_MAXSERV,
                       NI_NUMERICSERV);
   if (s != 0) {
@@ -83,6 +104,6 @@ void swim_process_event(SWIM *swim, Event *event, size_t bytes,
 
   /* We notice that we have seen the sending server as well, so that we do not
    * need to ping it unnecessarily. */
-  swim_state_update_time(swim, &event->hdr.uuid, &event->hdr.time);
+  swim_state_update_time(swim, event->hdr.uuid, &event->hdr.time);
   (*info->callback)(swim, event, addr, addrlen);
 }

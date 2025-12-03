@@ -8,25 +8,41 @@
 
 #include <netinet/in.h>
 
+/*
+ * Instance state data.
+ *
+ * This stores additional data beyond the normal instance data that
+ * are present in the events. In particular, address of the instance
+ * as seen when receiving an event from a joining instance and
+ * outstanding ping requests.
+ */
+typedef struct InstanceState {
+  InstanceData base;
+
+  /*
+   * Address of the server when a JOIN request was received.
+   */
+  struct sockaddr_storage addr;
+  socklen_t addrlen;
+} InstanceState;
+
 typedef struct SWIM {
   int sockfd;
-  union {
-    struct sockaddr_in ip4;
-    struct sockaddr_in6 ip6;
-  } addr;
-
+  struct sockaddr_in addr;
   uuid_t uuid;
-
   size_t view_capacity;
   size_t view_size;
-  Instance* view;
+  InstanceState* view;
 } SWIM;
 
 extern bool swim_state_init(SWIM* swim, uint16_t port);
+extern void swim_state_add(SWIM* swim, InstanceData* instance,
+                           struct sockaddr* addr, socklen_t addrlen);
+extern void swim_state_del(SWIM* swim, uuid_t);
 extern void swim_state_print(SWIM* swim);
-extern void swim_state_update_time(SWIM* swim, uuid_t* uuid,
+extern InstanceState* swim_state_get(SWIM* swim, uuid_t uuid);
+extern void swim_state_update_time(SWIM* swim, uuid_t uuid,
                                    struct timespec* time);
-extern void swim_state_add_instance(SWIM* swim, Instance* instance);
-extern void swim_state_del_instance(SWIM* swim, uuid_t);
+extern void swim_state_set_status(SWIM* swim, uuid_t uuid, Status status);
 
 #endif /* SWIM_STATE_H_ */

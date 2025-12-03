@@ -35,8 +35,8 @@ static bool timespec_after(struct timespec *old, struct timespec *new) {
  */
 static int instance_compare(const void *pkey, const void *pinstance) {
   const uuid_t *key = (const uuid_t *)pkey;
-  const Instance *instance = pinstance;
-  return uuid_compare(*key, instance->uuid);
+  const InstanceState *instance = pinstance;
+  return uuid_compare(*key, instance->base.uuid);
 }
 
 bool swim_state_init(SWIM *swim, uint16_t port) {
@@ -67,48 +67,60 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
 
   TRACE("initialized server to listen on %s:%s", host, service);
 
-  swim->view_capacity = 32;
+  swim->view_capacity = 32; /* Cannot be zero, since it is doubled each time */
   swim->view_size = 0;
-  swim->view = calloc(swim->view_capacity, sizeof(Instance));
+  swim->view = calloc(swim->view_capacity, sizeof(InstanceState));
+  swim->addr = serveraddr;
+  swim->sockfd = fd;
 
   uuid_generate(swim->uuid);
-
-  swim->addr.ip4 = serveraddr;
-  swim->sockfd = fd;
 
   return true;
 }
 
-void swim_state_update_time(SWIM *swim, uuid_t *uuid, struct timespec *time) {
-  Instance *instance = bsearch(uuid, swim->view, swim->view_size,
-                               sizeof(Instance), instance_compare);
-  if (instance != NULL && timespec_after(&instance->last_seen, time))
-    memcpy(&instance->last_seen, time, sizeof(instance->last_seen));
+void swim_state_update_time(SWIM *swim, uuid_t uuid, struct timespec *time) {
+  InstanceState *instance = swim_state_get(swim, uuid);
+  if (instance != NULL && timespec_after(&instance->base.last_seen, time))
+    memcpy(&instance->base.last_seen, time, sizeof(instance->base.last_seen));
 }
 
-void swim_state_add_instance(SWIM *swim, Instance *instance) {
+void swim_state_add(SWIM *swim, InstanceData *instance, struct sockaddr *addr,
+                    socklen_t addrlen) {
+  InstanceState *instance_state;
+
   if (swim->view_size >= swim->view_capacity) {
     swim->view = realloc(swim->view, 2 * swim->view_capacity);
     swim->view_capacity *= 2;
   }
 
-  swim->view[swim->view_size++] = *instance;
-  qsort(swim->view, swim->view_size, sizeof(Instance), instance_compare);
+  instance_state = &swim->view[swim->view_size++];
+
+  instance_state->base = *instance;
+  instance_state->addrlen = addrlen;
+  memcpy(&instance_state->addr, addr, addrlen);
+  qsort(swim->view, swim->view_size, sizeof(InstanceState), instance_compare);
 }
 
-void swim_state_del_instance(SWIM *swim, uuid_t uuid) {
-  Instance *instance = bsearch(uuid, swim->view, swim->view_size,
-                               sizeof(Instance), instance_compare);
+void swim_state_del(SWIM *swim, uuid_t uuid) {
+  swim_state_set_status(swim, uuid, SWIM_STATUS_DEAD);
+}
+
+void swim_state_set_status(SWIM *swim, uuid_t uuid, Status status) {
+  InstanceState *instance = bsearch(uuid, swim->view, swim->view_size,
+                                    sizeof(InstanceState), instance_compare);
   if (instance != NULL)
-    instance->status = SWIM_STATUS_DEAD;
+    instance->base.status = status;
 }
 
-static const char *timespec2str(struct timespec *ts) {
-  static char buf[64];
+InstanceState *swim_state_get(SWIM *swim, uuid_t uuid) {
+  return bsearch(uuid, swim->view, swim->view_size, sizeof(InstanceState),
+                 instance_compare);
+}
+
+static const char *timespec_string(struct timespec *ts, char *buf) {
   char *ptr = buf;
   struct tm t;
 
-  tzset();
   if (localtime_r(&(ts->tv_sec), &t) == NULL)
     return NULL;
 
@@ -119,19 +131,32 @@ static const char *timespec2str(struct timespec *ts) {
 }
 
 void swim_state_print(SWIM *swim) {
+  char uuid_buf[40], host[NI_MAXHOST], service[NI_MAXSERV];
+
   TRACE("view_size: %lu, view_capacity: %lu", swim->view_size,
         swim->view_capacity);
 
-  fprintf(stderr, "%40s %21s %10s\n", "UUID", "TIME", "STATUS");
+  fprintf(stderr, "%-40s %-20s %-10s %-20s %-10s\n", "UUID", "TIME", "STATUS",
+          "ADDRESS", "PORT");
   for (size_t i = 0; i < swim->view_size; ++i) {
-    Instance *instance = &swim->view[i];
-    char uuid_buf[40];
+    InstanceState *instance = &swim->view[i];
 
     if (instance) {
-      uuid_unparse(instance->uuid, uuid_buf);
-      fprintf(stderr, "%40s %20s %10s\n", uuid_buf,
-              timespec2str(&instance->last_seen),
-              status_name[instance->status]);
+      char buf[128];
+      int err =
+          getnameinfo((struct sockaddr *)&instance->addr, instance->addrlen,
+                      host, NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICSERV);
+
+      uuid_unparse(instance->base.uuid, uuid_buf);
+      if (err == 0) {
+        fprintf(stderr, "%-40s %-20s %-10s %-20s %-10s\n", uuid_buf,
+                timespec_string(&instance->base.last_seen, buf),
+                status_name[instance->base.status], host, service);
+      } else {
+        fprintf(stderr, "%-40s %-20s %-10s\n", uuid_buf,
+                timespec_string(&instance->base.last_seen, buf),
+                status_name[instance->base.status]);
+      }
     }
   }
 }

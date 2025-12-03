@@ -62,11 +62,14 @@ struct LeaveEvent {
   uuid_t leave_uuid;
 };
 
-typedef struct Instance {
+/*
+ * Instance data that we send out to the cluster.
+ */
+typedef struct InstanceData {
   uuid_t uuid;
   struct timespec last_seen;
   Status status;
-} Instance;
+} InstanceData;
 
 typedef struct Event {
   union {
@@ -77,7 +80,7 @@ typedef struct Event {
     struct LeaveEvent leave;
   };
   size_t gossip_count;
-  Instance gossip_instances[];
+  InstanceData instances_gossip[];
 } Event;
 
 bool swim_event_string(Event* event, char* buf, size_t);
