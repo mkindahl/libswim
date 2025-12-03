@@ -41,7 +41,7 @@ static int instance_compare(const void *pkey, const void *pinstance) {
 
 bool swim_state_init(SWIM *swim, uint16_t port) {
   struct sockaddr_in serveraddr;
-  char host[NI_MAXHOST], service[NI_MAXSERV];
+  char host[NI_MAXHOST], service[NI_MAXSERV], uuid_buf[40];
   int err, fd;
   ssize_t res;
 
@@ -65,8 +65,6 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
     return false;
   }
 
-  TRACE("initialized server to listen on %s:%s", host, service);
-
   swim->view_capacity = 32; /* Cannot be zero, since it is doubled each time */
   swim->view_size = 0;
   swim->view = calloc(swim->view_capacity, sizeof(InstanceState));
@@ -74,6 +72,10 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
   swim->sockfd = fd;
 
   uuid_generate(swim->uuid);
+
+  uuid_unparse(swim->uuid, uuid_buf);
+  TRACE("initialized server with UUID %s to listen on %s:%s", uuid_buf, host,
+        service);
 
   return true;
 }

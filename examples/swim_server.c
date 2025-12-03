@@ -8,30 +8,96 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#include "swim/debug.h"
+#include "swim/cluster.h"
+#include "swim/defs.h"
 #include "swim/event.h"
 #include "swim/network.h"
 #include "swim/process.h"
-#include "swim/swim.h"
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#define BUFSIZE 1024
+#define STR(X) EXPAND(X)
+#define EXPAND(X) #X
 
-int main(__attribute__((__unused__)) int argc,
-         __attribute__((__unused__)) char **argv) {
+struct options {
+  int listen_port;
+  struct sockaddr_storage addr;
+  socklen_t addrlen;
+};
+
+static void print_usage(const char *program_name) {
+  fprintf(stderr, "usage: %s [ -l PORT ] [ HOSTNAME [ PORT ] ]\n",
+          program_name);
+  exit(EXIT_FAILURE);
+}
+
+static struct options parse_options(int argc, char *argv[]) {
+  int opt, err;
+  struct addrinfo *result, hints;
+  struct options options = {.listen_port = SWIM_DEFAULT_PORTNO};
+  char *service = STR(SWIM_DEFAULT_PORTNO);
+  char *hostname = NULL;
+
+  while ((opt = getopt(argc, argv, "l:")) != -1) {
+    switch (opt) {
+      case 'l':
+        options.listen_port = atoi(optarg);
+        break;
+      default:
+        print_usage(argv[0]);
+    }
+  }
+
+  if (optind < argc)
+    hostname = argv[optind++];
+
+  if (optind < argc)
+    service = argv[optind++];
+
+  if (hostname != NULL) {
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_protocol = 0;
+    hints.ai_flags = 0;
+
+    err = getaddrinfo(hostname, service, &hints, &result);
+    if (err != 0) {
+      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
+      exit(EXIT_FAILURE);
+    }
+
+    memcpy(&options.addr, result->ai_addr, result->ai_addrlen);
+    options.addrlen = result->ai_addrlen;
+
+    freeaddrinfo(result);
+  }
+
+  return options;
+}
+
+int main(int argc, char *argv[]) {
   SWIM swim;
-  char buf[BUFSIZE];
-  struct sockaddr_storage addr_storage;
-  struct sockaddr *addr = (struct sockaddr *)&addr_storage;
-  socklen_t addrlen = sizeof(addr_storage);
+  struct options options;
 
-  swim_state_init(&swim, SWIM_DEFAULT_PORTNO);
+  options = parse_options(argc, argv);
 
-  while (1) {
+  swim_state_init(&swim, options.listen_port);
+
+  if (options.addrlen > 0)
+    swim_cluster_join(&swim, (struct sockaddr *)&options.addr, options.addrlen);
+
+  while (true) {
+    size_t bytes;
+    char buf[SWIM_MAXPACKET];
+    struct sockaddr_storage addr_storage;
+
+    struct sockaddr *addr = (struct sockaddr *)&addr_storage;
+    socklen_t addrlen = sizeof(addr_storage);
     Event *event = (Event *)buf;
-    size_t bytes = swim_recv_packet(&swim, buf, sizeof(buf), addr, addrlen);
+
+    bytes = swim_recv_packet(&swim, buf, sizeof(buf), addr, addrlen);
     swim_process_event(&swim, event, bytes, addr, addrlen);
     swim_state_print(&swim);
   }
