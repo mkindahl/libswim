@@ -18,20 +18,6 @@
 #include "swim/network.h"
 
 /*
- * Helper function to send ACK.
- */
-static void swim_send_ack(SWIM *swim, struct sockaddr *addr,
-                          socklen_t addrlen) {
-  Event response;
-
-  response.hdr.type = EVENT_TYPE_ACK;
-  clock_gettime(CLOCK_REALTIME, &response.hdr.time);
-  uuid_copy(response.hdr.uuid, swim->uuid);
-
-  swim_send_packet(swim, &response, sizeof(response), addr, addrlen);
-}
-
-/*
  * Process the reception of a PING message.
  *
  * We just respond that we are alive.

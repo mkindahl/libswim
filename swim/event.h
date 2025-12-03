@@ -3,10 +3,16 @@
 
 #include <stdbool.h>
 
+#include <sys/socket.h>
+
 #include <uuid/uuid.h>
 
 /*
  * Type of an event.
+ *
+ * This includes all events that can change state, not only messages
+ * received. We do not distinguish between notification-style messages
+ * (such as JOIN and LEAVE) and cluster events (such as PING and ACK).
  */
 typedef enum EventType {
   EVENT_TYPE_PING,
@@ -75,5 +81,6 @@ typedef struct Event {
 } Event;
 
 bool swim_event_string(Event* event, char* buf, size_t);
+void swim_event_init(uuid_t uuid, Event* event, EventType type);
 
 #endif /* SWIM_EVENT_H_ */

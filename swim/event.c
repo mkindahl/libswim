@@ -30,3 +30,9 @@ bool swim_event_string(Event* event, char* buf, size_t buflen) {
   uuid_unparse(event->hdr.uuid, ptr);
   return true;
 }
+
+void swim_event_init(uuid_t uuid, Event* event, EventType type) {
+  event->hdr.type = type;
+  clock_gettime(CLOCK_REALTIME, &event->hdr.time);
+  uuid_copy(event->hdr.uuid, uuid);
+}
