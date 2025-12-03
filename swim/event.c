@@ -1,7 +1,11 @@
 #include "swim/event.h"
 
+#include <assert.h>
 #include <memory.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+#include "swim/defs.h"
 
 bool swim_event_decode(Event* event, const char* buf, size_t buflen) {
   memcpy(event, buf, buflen);
@@ -31,8 +35,23 @@ bool swim_event_string(Event* event, char* buf, size_t buflen) {
   return true;
 }
 
-void swim_event_init(uuid_t uuid, Event* event, EventType type) {
+Event* swim_event_create(uuid_t uuid, EventType type, size_t gossip_count) {
+  const size_t event_size = sizeof(Event) + gossip_count * sizeof(InstanceData);
+  Event* event = malloc(event_size);
+
+  assert(event_size < SWIM_MAXPACKET);
+
+  memset(event, 0, event_size);
+
+  swim_event_init(event, uuid, type, event_size);
+  event->hdr.gossip_count = gossip_count;
+
+  return event;
+}
+
+void swim_event_init(Event* event, uuid_t uuid, EventType type, size_t size) {
   event->hdr.type = type;
+  event->hdr.event_size = size;
   clock_gettime(CLOCK_REALTIME, &event->hdr.time);
   uuid_copy(event->hdr.uuid, uuid);
 }

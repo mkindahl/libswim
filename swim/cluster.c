@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "swim/event.h"
 #include "swim/network.h"
 
 /*
@@ -14,7 +15,7 @@
 void swim_cluster_join(SWIM* swim, struct sockaddr* addr, socklen_t addrlen) {
   Event event;
 
-  swim_event_init(swim->uuid, &event, EVENT_TYPE_JOIN);
+  swim_event_init(&event, swim->uuid, EVENT_TYPE_JOIN, sizeof(event));
 
   uuid_copy(event.join.join_uuid, swim->uuid);
   memcpy(&event.join.join_addr, &swim->addr, sizeof(swim->addr));
@@ -39,6 +40,6 @@ void swim_cluster_join(SWIM* swim, struct sockaddr* addr, socklen_t addrlen) {
 void swim_cluster_leave(SWIM* swim, struct sockaddr* addr, socklen_t addrlen) {
   Event event;
 
-  swim_event_init(swim->uuid, &event, EVENT_TYPE_LEAVE);
+  swim_event_init(&event, swim->uuid, EVENT_TYPE_LEAVE, sizeof(event));
   swim_send_packet(swim, &event, sizeof(event), addr, addrlen);
 }

@@ -1,5 +1,8 @@
 #include "swim/network.h"
 
+#include <sys/param.h>
+
+#include "swim/defs.h"
 #include "swim/event.h"
 
 ssize_t swim_recv_packet(SWIM *swim, void *buf, size_t buflen,
@@ -15,19 +18,35 @@ ssize_t swim_send_packet(SWIM *swim, void *buf, size_t buflen,
 /*
  * Helper function to send ACK.
  */
-void swim_send_ack(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
-  Event response;
+ssize_t swim_send_ack(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
+  const int gossip_count = MIN(swim->view_size, SWIM_MAXGOSSIP);
+  Event *event = swim_event_create(swim->uuid, EVENT_TYPE_ACK, gossip_count);
 
-  swim_event_init(swim->uuid, &response, EVENT_TYPE_ACK);
-  swim_send_packet(swim, &response, sizeof(response), addr, addrlen);
+  if (swim->view_size < SWIM_MAXGOSSIP) {
+    for (int i = 0; i < swim->view_size; ++i)
+      event->gossip_instances[i] = swim->view[i].base;
+  } else {
+    for (int i = 0; i < gossip_count; ++i)
+      event->gossip_instances[i] = swim->view[rand() % swim->view_size].base;
+  }
+
+  return swim_send_packet(swim, event, event->hdr.event_size, addr, addrlen);
 }
 
 /*
  * Helper function to send PING.
  */
-void swim_send_ping(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
-  Event response;
+ssize_t swim_send_ping(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
+  const int gossip_count = MIN(swim->view_size, SWIM_MAXGOSSIP);
+  Event *event = swim_event_create(swim->uuid, EVENT_TYPE_PING, gossip_count);
 
-  swim_event_init(swim->uuid, &response, EVENT_TYPE_PING);
-  swim_send_packet(swim, &response, sizeof(response), addr, addrlen);
+  if (swim->view_size < SWIM_MAXGOSSIP) {
+    for (int i = 0; i < swim->view_size; ++i)
+      event->gossip_instances[i] = swim->view[i].base;
+  } else {
+    for (int i = 0; i < gossip_count; ++i)
+      event->gossip_instances[i] = swim->view[rand() % swim->view_size].base;
+  }
+
+  return swim_send_packet(swim, &event, event->hdr.event_size, addr, addrlen);
 }

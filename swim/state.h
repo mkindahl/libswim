@@ -18,26 +18,25 @@
  */
 typedef struct InstanceState {
   InstanceData base;
-
-  /*
-   * Address of the server when a JOIN request was received.
-   */
-  struct sockaddr_storage addr;
-  socklen_t addrlen;
 } InstanceState;
 
+/*
+ * SWIM state including current view.
+ *
+ * The view does not include the node instance itself since that is
+ * unnecessary to track.
+ */
 typedef struct SWIM {
   int sockfd;
   struct sockaddr_in addr;
   uuid_t uuid;
-  size_t view_capacity;
-  size_t view_size;
+  int view_capacity;
+  int view_size;
   InstanceState* view;
 } SWIM;
 
 extern bool swim_state_init(SWIM* swim, uint16_t port);
-extern void swim_state_add(SWIM* swim, InstanceData* instance,
-                           struct sockaddr* addr, socklen_t addrlen);
+extern void swim_state_add(SWIM* swim, InstanceData* instance);
 extern void swim_state_del(SWIM* swim, uuid_t);
 extern void swim_state_print(SWIM* swim);
 extern InstanceState* swim_state_get(SWIM* swim, uuid_t uuid);

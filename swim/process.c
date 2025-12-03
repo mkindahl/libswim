@@ -23,16 +23,37 @@
  *
  * We just respond that we are alive.
  */
-static void swim_process_ping(SWIM *swim,
-                              __attribute__((__unused__)) Event *event,
-                              struct sockaddr *addr, socklen_t addrlen) {
+static void swim_process_ping(SWIM *swim, Event *event,
+                              __attribute__((__unused__)) struct sockaddr *addr,
+                              __attribute__((__unused__)) socklen_t addrlen) {
+  InstanceData sender = {.status = SWIM_STATUS_ALIVE};
+
   swim_send_ack(swim, addr, addrlen);
+
+  memcpy(&sender.addr, addr, addrlen);
+  uuid_copy(sender.uuid, event->hdr.uuid);
+  clock_gettime(CLOCK_REALTIME, &sender.last_seen);
+  sender.addrlen = addrlen;
+
+  swim_state_add(swim, &sender);
+  for (int i = 0; i < event->hdr.gossip_count; ++i)
+    swim_state_add(swim, &event->gossip_instances[i]);
 }
 
-static void swim_process_ack(__attribute__((__unused__)) SWIM *swim,
-                             __attribute__((__unused__)) Event *event,
+static void swim_process_ack(SWIM *swim, Event *event,
                              __attribute__((__unused__)) struct sockaddr *addr,
-                             __attribute__((__unused__)) socklen_t addrlen) {}
+                             __attribute__((__unused__)) socklen_t addrlen) {
+  InstanceData sender = {.status = SWIM_STATUS_ALIVE};
+
+  memcpy(&sender.addr, addr, addrlen);
+  uuid_copy(sender.uuid, event->hdr.uuid);
+  clock_gettime(CLOCK_REALTIME, &sender.last_seen);
+  sender.addrlen = addrlen;
+
+  swim_state_add(swim, &sender);
+  for (int i = 0; i < event->hdr.gossip_count; ++i)
+    swim_state_add(swim, &event->gossip_instances[i]);
+}
 
 /*
  * Process the reception of an JOIN message.
@@ -52,8 +73,11 @@ static void swim_process_join(SWIM *swim, Event *event, struct sockaddr *addr,
       .status = SWIM_STATUS_ALIVE,
   };
 
+  memcpy(&instance.addr, addr, addrlen);
+  instance.addrlen = addrlen;
   uuid_copy(instance.uuid, join->join_uuid);
-  swim_state_add(swim, &instance, addr, addrlen);
+
+  swim_state_add(swim, &instance);
   swim_send_ack(swim, addr, addrlen);
 }
 

@@ -37,9 +37,11 @@ typedef enum Status {
 } Status;
 
 typedef struct EventHeader {
+  size_t event_size;
   EventType type;
   uuid_t uuid;
   struct timespec time;
+  int gossip_count;
 } EventHeader;
 
 struct PingEvent {
@@ -69,8 +71,19 @@ typedef struct InstanceData {
   uuid_t uuid;
   struct timespec last_seen;
   Status status;
+  struct sockaddr_storage addr;
+  socklen_t addrlen;
 } InstanceData;
 
+/*
+ * Event with gossip.
+ *
+ * Caveat:
+ *
+ *   Since the minimum MTU for a UDP packet is quite small (508 bytes,
+ *   if you do not count the IP header), we should not attach gossip
+ *   data and rather have separate messages for gossip.
+ */
 typedef struct Event {
   union {
     EventHeader hdr;
@@ -79,11 +92,14 @@ typedef struct Event {
     struct JoinEvent join;
     struct LeaveEvent leave;
   };
-  size_t gossip_count;
-  InstanceData instances_gossip[];
+
+  InstanceData gossip_instances[];
 } Event;
 
-bool swim_event_string(Event* event, char* buf, size_t);
-void swim_event_init(uuid_t uuid, Event* event, EventType type);
+extern bool swim_event_string(Event* event, char* buf, size_t);
+extern void swim_event_init(Event* event, uuid_t uuid, EventType type,
+                            size_t size);
+extern Event* swim_event_create(uuid_t uuid, EventType type,
+                                size_t gossip_count);
 
 #endif /* SWIM_EVENT_H_ */

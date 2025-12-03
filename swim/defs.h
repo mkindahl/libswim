@@ -2,6 +2,7 @@
 #define SWIM_DEFS_H_
 
 #define SWIM_DEFAULT_PORTNO 7946
-#define SWIM_MAXPACKET 1024
+#define SWIM_MAXPACKET 2048
+#define SWIM_MAXGOSSIP 10
 
 #endif /* SWIM_DEFS_H_ */
