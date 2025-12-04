@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <sys/socket.h>
@@ -26,6 +27,11 @@ struct options {
   socklen_t addrlen;
 };
 
+static void server_loop(SWIM *swim);
+
+/*
+ * Print usage and exit.
+ */
 static void print_usage(const char *program_name) {
   fprintf(stderr, "usage: %s [ -l PORT ] [ HOSTNAME [ PORT ] ]\n",
           program_name);
@@ -88,17 +94,28 @@ int main(int argc, char *argv[]) {
   if (options.addrlen > 0)
     swim_cluster_join(&swim, (struct sockaddr *)&options.addr, options.addrlen);
 
-  while (true) {
-    size_t bytes;
-    char buf[SWIM_MAXPACKET];
-    struct sockaddr_storage addr_storage;
+  server_loop(&swim);
+}
 
+static void server_loop(SWIM *swim) {
+  ssize_t bytes;
+  char buf[SWIM_MAXPACKET];
+  struct sockaddr_storage addr_storage;
+
+  while (true) {
     struct sockaddr *addr = (struct sockaddr *)&addr_storage;
     socklen_t addrlen = sizeof(addr_storage);
     Event *event = (Event *)buf;
 
-    bytes = swim_recv_packet(&swim, buf, sizeof(buf), addr, addrlen);
-    swim_process_event(&swim, event, bytes, addr, addrlen);
-    swim_state_print(&swim);
+    bytes = swim_recv_packet(swim, buf, sizeof(buf), addr, addrlen);
+    if (bytes > 0) {
+      swim_process_event(swim, event, bytes, addr, addrlen);
+    } else if (swim->view_size > 0) {
+      InstanceState *instance = &swim->view[rand() % swim->view_size];
+      swim_send_ping(swim, (struct sockaddr *)&instance->base.addr,
+                     instance->base.addrlen);
+    }
+
+    swim_state_print(swim);
   }
 }

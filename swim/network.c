@@ -52,8 +52,12 @@ ssize_t swim_send_ack(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
  * Helper function to send PING.
  */
 ssize_t swim_send_ping(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
+  ssize_t result;
+  char buf[128] = {0};
   const int gossip_count = MIN(swim->view_size, SWIM_MAXGOSSIP);
   Event *event = swim_event_create(swim->uuid, EVENT_TYPE_PING, gossip_count);
+
+  TRACE("sending ping to %s", addr2str_r(addr, addrlen, buf, sizeof(buf)));
 
   if (swim->view_size < SWIM_MAXGOSSIP) {
     for (int i = 0; i < swim->view_size; ++i)
@@ -63,5 +67,9 @@ ssize_t swim_send_ping(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
       event->gossip_instances[i] = swim->view[rand() % swim->view_size].base;
   }
 
-  return swim_send_packet(swim, &event, event->hdr.event_size, addr, addrlen);
+  result = swim_send_event(swim, event, addr, addrlen);
+
+  free(event);
+
+  return result;
 }

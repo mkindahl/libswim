@@ -34,12 +34,20 @@ static int instance_compare(const void *pkey, const void *pinstance) {
 bool swim_state_init(SWIM *swim, uint16_t port) {
   struct sockaddr_in serveraddr;
   char addrbuf[NI_MAXHOST + NI_MAXSERV + 1], uuid_buf[40];
-  int fd;
+  int err, fd;
   ssize_t res;
+  struct timeval timeout = {.tv_sec = 1, .tv_usec = 0};
 
   fd = socket(AF_INET, SOCK_DGRAM, 0);
   if (fd < 0)
     return false;
+
+  err = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+  if (err < 0) {
+    perror("setsockopt");
+    exit(EXIT_FAILURE);
+  }
 
   memset(&serveraddr, 0, sizeof(serveraddr));
   serveraddr.sin_family = AF_INET;
