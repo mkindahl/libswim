@@ -1,10 +1,12 @@
-#include "swim/network.h"
+#include "network.h"
 
 #include <netdb.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <sys/param.h>
 
+#include "swim/debug.h"
 #include "swim/defs.h"
 #include "swim/event.h"
 #include "swim/utils.h"

@@ -18,6 +18,7 @@
 #include "swim/debug.h"
 #include "swim/event.h"
 #include "swim/network.h"
+#include "swim/utils.h"
 
 /*
  * Process the reception of a PING message.
@@ -115,17 +116,11 @@ static struct EventInfo swim_event_processing[] = {
 
 void swim_process_event(SWIM *swim, Event *event, size_t bytes,
                         struct sockaddr *addr, socklen_t addrlen) {
-  char host[NI_MAXHOST];
-  char service[NI_MAXSERV];
+  char buf[NI_MAXHOST + NI_MAXSERV + 1];
   EventInfo *info = &swim_event_processing[event->hdr.type];
-  int s = getnameinfo(addr, addrlen, host, NI_MAXHOST, service, NI_MAXSERV,
-                      NI_NUMERICSERV);
-  if (s != 0) {
-    perror("getnameinfo");
-    exit(EXIT_FAILURE);
-  }
 
-  TRACE("Got %s of %zd bytes from %s:%s", info->name, bytes, host, service);
+  TRACE("Got %s of %zd bytes from %s", info->name, bytes,
+        addr2str_r(addr, addrlen, buf, sizeof(buf)));
 
   /* We notice that we have seen the sending server as well, so that we do not
    * need to ping it unnecessarily. */

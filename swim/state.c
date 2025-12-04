@@ -9,6 +9,8 @@
 
 #include "swim/debug.h"
 #include "swim/event.h"
+#include "swim/network.h"
+#include "swim/utils.h"
 
 static const char *status_name[] = {
     [SWIM_STATUS_UNKNOWN] = "UNKNOWN",
@@ -31,8 +33,8 @@ static int instance_compare(const void *pkey, const void *pinstance) {
 
 bool swim_state_init(SWIM *swim, uint16_t port) {
   struct sockaddr_in serveraddr;
-  char host[NI_MAXHOST], service[NI_MAXSERV], uuid_buf[40];
-  int err, fd;
+  char addrbuf[NI_MAXHOST + NI_MAXSERV + 1], uuid_buf[40];
+  int fd;
   ssize_t res;
 
   fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -48,13 +50,6 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
   if (res < 0)
     return false;
 
-  err = getnameinfo((struct sockaddr *)&serveraddr, sizeof(serveraddr), host,
-                    NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICSERV);
-  if (err != 0) {
-    TRACE("getnameinfo: %s", gai_strerror(err));
-    return false;
-  }
-
   swim->view_capacity = 32; /* Cannot be zero, since it is doubled each time */
   swim->view_size = 0;
   swim->view = calloc(swim->view_capacity, sizeof(InstanceState));
@@ -64,8 +59,9 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
   uuid_generate(swim->uuid);
 
   uuid_unparse(swim->uuid, uuid_buf);
-  TRACE("initialized server with UUID %s to listen on %s:%s", uuid_buf, host,
-        service);
+  TRACE("initialized server with UUID %s to listen on %s", uuid_buf,
+        addr2str_r((struct sockaddr *)&serveraddr, sizeof(serveraddr), addrbuf,
+                   sizeof(addrbuf)));
 
   return true;
 }
