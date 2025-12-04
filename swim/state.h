@@ -4,27 +4,26 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "swim/event.h"
-
 #include <netinet/in.h>
 
+#include "swim/event.h"
+
 /*
- * Instance state data.
+ * Node state data.
  *
- * This stores additional data beyond the normal instance data that
- * are present in the events. In particular, address of the instance
- * as seen when receiving an event from a joining instance and
- * outstanding ping requests.
+ * This stores additional data beyond the normal node data that are
+ * present in the events. In particular, address of the node as
+ * seen when receiving an event from a joining node.
  */
-typedef struct InstanceState {
-  InstanceData base;
-} InstanceState;
+typedef struct NodeState {
+  NodeInfo info;
+} NodeState;
 
 /*
  * SWIM state including current view.
  *
- * The view does not include the node instance itself since that is
- * unnecessary to track.
+ * The view does not include the node itself since that is unnecessary
+ * to track.
  */
 typedef struct SWIM {
   int sockfd;
@@ -32,14 +31,14 @@ typedef struct SWIM {
   uuid_t uuid;
   int view_capacity;
   int view_size;
-  InstanceState* view;
+  NodeState * view;
 } SWIM;
 
 extern bool swim_state_init(SWIM* swim, uint16_t port);
-extern void swim_state_add(SWIM* swim, InstanceData* instance);
+extern void swim_state_add(SWIM* swim, NodeInfo* info);
 extern void swim_state_del(SWIM* swim, uuid_t);
 extern void swim_state_print(SWIM* swim);
-extern InstanceState* swim_state_get(SWIM* swim, uuid_t uuid);
+extern NodeState * swim_state_get(SWIM* swim, uuid_t uuid);
 extern void swim_state_update_time(SWIM* swim, uuid_t uuid,
                                    struct timeval* time);
 extern void swim_state_set_status(SWIM* swim, uuid_t uuid, Status status);

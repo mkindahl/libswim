@@ -5,6 +5,8 @@
 
 #include <sys/socket.h>
 
+#include "swim/node.h"
+
 #include <uuid/uuid.h>
 
 /*
@@ -20,21 +22,6 @@ typedef enum EventType {
   EVENT_TYPE_JOIN,
   EVENT_TYPE_LEAVE,
 } EventType;
-
-/*
- * Status of an instance.
- *
- * Instances can be alive, suspected dead, or declared dead.
- *
- * State can also be unknown, which is mostly relevent for servers
- * that are newly added to the cluster.
- */
-typedef enum Status {
-  SWIM_STATUS_UNKNOWN,
-  SWIM_STATUS_ALIVE,
-  SWIM_STATUS_SUSPECT,
-  SWIM_STATUS_DEAD,
-} Status;
 
 typedef struct EventHeader {
   size_t event_size;
@@ -65,20 +52,6 @@ struct LeaveEvent {
 };
 
 /*
- * Instance data that we send out to the cluster.
- *
- * TODO: Probably do not need microsecond precision, so swithing to
- * use just time_t is probably preferrable.
- */
-typedef struct InstanceData {
-  uuid_t uuid;
-  struct timeval last_seen;
-  Status status;
-  struct sockaddr_storage addr;
-  socklen_t addrlen;
-} InstanceData;
-
-/*
  * Event with gossip.
  *
  * Caveat:
@@ -96,7 +69,7 @@ typedef struct Event {
     struct LeaveEvent leave;
   };
 
-  InstanceData gossip_instances[];
+  NodeInfo gossip[];
 } Event;
 
 extern bool swim_event_string(Event* event, char* buf, size_t);

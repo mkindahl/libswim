@@ -36,7 +36,7 @@ bool swim_event_string(Event* event, char* buf, size_t buflen) {
 }
 
 Event* swim_event_create(uuid_t uuid, EventType type, size_t gossip_count) {
-  const size_t event_size = sizeof(Event) + gossip_count * sizeof(InstanceData);
+  const size_t event_size = sizeof(Event) + gossip_count * sizeof(NodeInfo);
   Event* event = malloc(event_size);
 
   assert(event_size < SWIM_MAXPACKET);

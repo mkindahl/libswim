@@ -39,10 +39,10 @@ ssize_t swim_send_ack(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
 
   if (swim->view_size < SWIM_MAXGOSSIP) {
     for (int i = 0; i < swim->view_size; ++i)
-      event->gossip_instances[i] = swim->view[i].base;
+      event->gossip[i] = swim->view[i].info;
   } else {
     for (int i = 0; i < gossip_count; ++i)
-      event->gossip_instances[i] = swim->view[rand() % swim->view_size].base;
+      event->gossip[i] = swim->view[rand() % swim->view_size].info;
   }
 
   return swim_send_packet(swim, event, event->hdr.event_size, addr, addrlen);
@@ -61,10 +61,10 @@ ssize_t swim_send_ping(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
 
   if (swim->view_size < SWIM_MAXGOSSIP) {
     for (int i = 0; i < swim->view_size; ++i)
-      event->gossip_instances[i] = swim->view[i].base;
+      event->gossip[i] = swim->view[i].info;
   } else {
     for (int i = 0; i < gossip_count; ++i)
-      event->gossip_instances[i] = swim->view[rand() % swim->view_size].base;
+      event->gossip[i] = swim->view[rand() % swim->view_size].info;
   }
 
   result = swim_send_event(swim, event, addr, addrlen);

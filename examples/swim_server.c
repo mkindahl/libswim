@@ -115,9 +115,9 @@ static void server_loop(SWIM *swim) {
     if (bytes > 0) {
       swim_process_event(swim, event, bytes, addr, addrlen);
     } else if (swim->view_size > 0) {
-      InstanceState *instance = &swim->view[rand() % swim->view_size];
-      swim_send_ping(swim, (struct sockaddr *)&instance->base.addr,
-                     instance->base.addrlen);
+      NodeState *node = &swim->view[rand() % swim->view_size];
+      swim_send_ping(swim, (struct sockaddr *)&node->info.addr,
+                     node->info.addrlen);
     }
 
     swim_state_print(swim);

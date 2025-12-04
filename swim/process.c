@@ -28,7 +28,7 @@
 static void swim_process_ping(SWIM *swim, Event *event,
                               __attribute__((__unused__)) struct sockaddr *addr,
                               __attribute__((__unused__)) socklen_t addrlen) {
-  InstanceData sender = {.status = SWIM_STATUS_ALIVE};
+  NodeInfo sender = {.status = SWIM_STATUS_ALIVE};
 
   swim_send_ack(swim, addr, addrlen);
 
@@ -39,13 +39,13 @@ static void swim_process_ping(SWIM *swim, Event *event,
 
   swim_state_add(swim, &sender);
   for (int i = 0; i < event->hdr.gossip_count; ++i)
-    swim_state_add(swim, &event->gossip_instances[i]);
+    swim_state_add(swim, &event->gossip[i]);
 }
 
 static void swim_process_ack(SWIM *swim, Event *event,
                              __attribute__((__unused__)) struct sockaddr *addr,
                              __attribute__((__unused__)) socklen_t addrlen) {
-  InstanceData sender = {.status = SWIM_STATUS_ALIVE};
+  NodeInfo sender = {.status = SWIM_STATUS_ALIVE};
 
   memcpy(&sender.addr, addr, addrlen);
   uuid_copy(sender.uuid, event->hdr.uuid);
@@ -54,7 +54,7 @@ static void swim_process_ack(SWIM *swim, Event *event,
 
   swim_state_add(swim, &sender);
   for (int i = 0; i < event->hdr.gossip_count; ++i)
-    swim_state_add(swim, &event->gossip_instances[i]);
+    swim_state_add(swim, &event->gossip[i]);
 }
 
 /*
@@ -70,16 +70,16 @@ static void swim_process_ack(SWIM *swim, Event *event,
 static void swim_process_join(SWIM *swim, Event *event, struct sockaddr *addr,
                               socklen_t addrlen) {
   struct JoinEvent *join = &event->join;
-  InstanceData instance = {
+  NodeInfo node = {
       .last_seen = event->hdr.time,
       .status = SWIM_STATUS_ALIVE,
   };
 
-  memcpy(&instance.addr, addr, addrlen);
-  instance.addrlen = addrlen;
-  uuid_copy(instance.uuid, join->join_uuid);
+  node.addrlen = addrlen;
+  memcpy(&node.addr, addr, addrlen);
+  uuid_copy(node.uuid, join->join_uuid);
 
-  swim_state_add(swim, &instance);
+  swim_state_add(swim, &node);
   swim_send_ack(swim, addr, addrlen);
 }
 

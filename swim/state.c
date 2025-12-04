@@ -20,15 +20,15 @@ static const char *status_name[] = {
 };
 
 /*
- * Compare two instances or a key and an instance.
+ * Compare two nodes or a key and an node.
  *
  * This can be used with both bsearch() and qsort() since the first
- * element of the Instance structure is the UUID field.
+ * element of the Node structure is the UUID field.
  */
-static int instance_compare(const void *pkey, const void *pinstance) {
+static int node_compare(const void *pkey, const void *pnode) {
   const uuid_t *key = (const uuid_t *)pkey;
-  const InstanceState *instance = pinstance;
-  return uuid_compare(*key, instance->base.uuid);
+  const NodeState *node = pnode;
+  return uuid_compare(*key, node->info.uuid);
 }
 
 bool swim_state_init(SWIM *swim, uint16_t port) {
@@ -60,7 +60,7 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
 
   swim->view_capacity = 32; /* Cannot be zero, since it is doubled each time */
   swim->view_size = 0;
-  swim->view = calloc(swim->view_capacity, sizeof(InstanceState));
+  swim->view = calloc(swim->view_capacity, sizeof(NodeState));
   swim->addr = serveraddr;
   swim->sockfd = fd;
 
@@ -75,52 +75,55 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
 }
 
 void swim_state_update_time(SWIM *swim, uuid_t uuid, struct timeval *time) {
-  InstanceState *instance = swim_state_get(swim, uuid);
-  if (instance != NULL && timercmp(&instance->base.last_seen, time, <=))
-    memcpy(&instance->base.last_seen, time, sizeof(instance->base.last_seen));
+  NodeState *node = swim_state_get(swim, uuid);
+  if (node != NULL && timercmp(&node->info.last_seen, time, <=))
+    memcpy(&node->info.last_seen, time, sizeof(node->info.last_seen));
 }
 
 /*
- * Add or update an instance to the state view.
+ * Add or update a node to the state view.
  *
- * If the instance is already in the view, we just update the
- * timestamp and mark it as alive.
+ * If the node is already in the view, we just update the timestamp
+ * and mark it as alive.
  *
  * Note:
  *
- *    How do we deal with instances that are declared dead but we get
+ *    How do we deal with nodes that are declared dead but we get
  *    gossip about them?
  *
- *    We should probably ignore the gossip and require the instance to
+ *    We should probably ignore the gossip and require the node to
  *    generate a new UUID and re-join the cluster.
  */
-void swim_state_add(SWIM *swim, InstanceData *instance) {
-  InstanceState *instance_state;
-  InstanceState *existing;
+void swim_state_add(SWIM *swim, NodeInfo *info) {
+  NodeState *existing;
 
-  /* We ignore adding the node itself, if that is passed for some reason */
-  if (uuid_compare(instance->uuid, swim->uuid) == 0)
+  /* We ignore adding the node itself, if that is passed for some
+     reason */
+  if (uuid_compare(info->uuid, swim->uuid) == 0)
     return;
 
-  if ((existing = swim_state_get(swim, instance->uuid))) {
-    memcpy(&existing->base.last_seen, &instance->last_seen,
-           sizeof(existing->base.last_seen));
-    existing->base.status = SWIM_STATUS_ALIVE;
+  if ((existing = swim_state_get(swim, info->uuid))) {
+    memcpy(&existing->info.last_seen, &info->last_seen,
+           sizeof(existing->info.last_seen));
+    existing->info.status = SWIM_STATUS_ALIVE;
   } else {
+    NodeState *node;
+
     if (swim->view_size >= swim->view_capacity) {
       swim->view = realloc(swim->view, 2 * swim->view_capacity);
       swim->view_capacity *= 2;
     }
 
-    instance_state = &swim->view[swim->view_size++];
-    instance_state->base = *instance;
+    node = &swim->view[swim->view_size++];
+    node->info = *info;
 
-    qsort(swim->view, swim->view_size, sizeof(InstanceState), instance_compare);
+    qsort(swim->view, swim->view_size, sizeof(NodeState), node_compare);
   }
 }
 
 void swim_state_del(SWIM *swim, uuid_t uuid) {
-  /* We ignore deleting the node itself, if that is passed for some reason */
+  /* We ignore deleting the node itself, if that is passed for some
+     reason */
   if (uuid_compare(uuid, swim->uuid) == 0)
     return;
 
@@ -128,14 +131,14 @@ void swim_state_del(SWIM *swim, uuid_t uuid) {
 }
 
 void swim_state_set_status(SWIM *swim, uuid_t uuid, Status status) {
-  InstanceState *instance = swim_state_get(swim, uuid);
-  if (instance != NULL)
-    instance->base.status = status;
+  NodeState *node = swim_state_get(swim, uuid);
+  if (node != NULL)
+    node->info.status = status;
 }
 
-InstanceState *swim_state_get(SWIM *swim, uuid_t uuid) {
-  return bsearch(uuid, swim->view, swim->view_size, sizeof(InstanceState),
-                 instance_compare);
+NodeState *swim_state_get(SWIM *swim, uuid_t uuid) {
+  return bsearch(uuid, swim->view, swim->view_size, sizeof(NodeState),
+                 node_compare);
 }
 
 static const char *timeval_string(struct timeval *ts, char *buf,
@@ -161,23 +164,23 @@ void swim_state_print(SWIM *swim) {
   fprintf(stderr, "%-40s %-26s %-10s %-20s %-10s\n", "UUID", "TIME", "STATUS",
           "ADDRESS", "PORT");
   for (int i = 0; i < swim->view_size; ++i) {
-    InstanceState *instance = &swim->view[i];
+    NodeState *node = &swim->view[i];
 
-    if (instance) {
+    if (node) {
       char buf[128];
-      int err = getnameinfo((struct sockaddr *)&instance->base.addr,
-                            instance->base.addrlen, host, NI_MAXHOST, service,
-                            NI_MAXSERV, NI_NUMERICSERV);
+      int err =
+          getnameinfo((struct sockaddr *)&node->info.addr, node->info.addrlen,
+                      host, NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICSERV);
 
-      uuid_unparse(instance->base.uuid, uuid_buf);
+      uuid_unparse(node->info.uuid, uuid_buf);
       if (err == 0) {
         fprintf(stderr, "%-40s %-26s %-10s %-20s %-10s\n", uuid_buf,
-                timeval_string(&instance->base.last_seen, buf, sizeof(buf)),
-                status_name[instance->base.status], host, service);
+                timeval_string(&node->info.last_seen, buf, sizeof(buf)),
+                status_name[node->info.status], host, service);
       } else {
         fprintf(stderr, "%-40s %-20s %-10s\n", uuid_buf,
-                timeval_string(&instance->base.last_seen, buf, sizeof(buf)),
-                status_name[instance->base.status]);
+                timeval_string(&node->info.last_seen, buf, sizeof(buf)),
+                status_name[node->info.status]);
       }
     }
   }

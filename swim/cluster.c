@@ -34,7 +34,7 @@ void swim_cluster_join(SWIM* swim, struct sockaddr* addr, socklen_t addrlen) {
  * arrives.
  *
  * In the event that all leave requests are lost, the cluster will
- * notice that the instance does not respond any more and eventually
+ * notice that the node does not respond any more and eventually
  * remove it from the cluster.
  */
 void swim_cluster_leave(SWIM* swim, struct sockaddr* addr, socklen_t addrlen) {
