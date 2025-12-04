@@ -41,7 +41,7 @@ extern void swim_state_del(SWIM* swim, uuid_t);
 extern void swim_state_print(SWIM* swim);
 extern InstanceState* swim_state_get(SWIM* swim, uuid_t uuid);
 extern void swim_state_update_time(SWIM* swim, uuid_t uuid,
-                                   struct timespec* time);
+                                   struct timeval* time);
 extern void swim_state_set_status(SWIM* swim, uuid_t uuid, Status status);
 
 #endif /* SWIM_STATE_H_ */

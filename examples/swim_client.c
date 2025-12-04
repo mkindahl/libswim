@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
 
 #include "swim/event.h"
@@ -100,7 +101,7 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
-  clock_gettime(CLOCK_REALTIME, &event.hdr.time);
+  gettimeofday(&event.hdr.time, NULL);
 
   uuid_generate(event.hdr.uuid);
 

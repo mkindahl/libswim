@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include <sys/socket.h>
+#include <sys/time.h>
 
 #include "swim/debug.h"
 #include "swim/event.h"
@@ -32,7 +33,7 @@ static void swim_process_ping(SWIM *swim, Event *event,
 
   memcpy(&sender.addr, addr, addrlen);
   uuid_copy(sender.uuid, event->hdr.uuid);
-  clock_gettime(CLOCK_REALTIME, &sender.last_seen);
+  gettimeofday(&sender.last_seen, NULL);
   sender.addrlen = addrlen;
 
   swim_state_add(swim, &sender);
@@ -47,7 +48,7 @@ static void swim_process_ack(SWIM *swim, Event *event,
 
   memcpy(&sender.addr, addr, addrlen);
   uuid_copy(sender.uuid, event->hdr.uuid);
-  clock_gettime(CLOCK_REALTIME, &sender.last_seen);
+  gettimeofday(&sender.last_seen, NULL);
   sender.addrlen = addrlen;
 
   swim_state_add(swim, &sender);

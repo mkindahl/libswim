@@ -18,16 +18,6 @@ static const char *status_name[] = {
 };
 
 /*
- * Check if a new timestamp is after an old timestamp.
- */
-static bool timespec_after(struct timespec *old, struct timespec *new) {
-  if (old->tv_sec == new->tv_sec)
-    return new->tv_nsec > old->tv_nsec;
-  else
-    return new->tv_sec > old->tv_sec;
-}
-
-/*
  * Compare two instances or a key and an instance.
  *
  * This can be used with both bsearch() and qsort() since the first
@@ -80,9 +70,9 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
   return true;
 }
 
-void swim_state_update_time(SWIM *swim, uuid_t uuid, struct timespec *time) {
+void swim_state_update_time(SWIM *swim, uuid_t uuid, struct timeval *time) {
   InstanceState *instance = swim_state_get(swim, uuid);
-  if (instance != NULL && timespec_after(&instance->base.last_seen, time))
+  if (instance != NULL && timercmp(&instance->base.last_seen, time, <=))
     memcpy(&instance->base.last_seen, time, sizeof(instance->base.last_seen));
 }
 
@@ -144,15 +134,16 @@ InstanceState *swim_state_get(SWIM *swim, uuid_t uuid) {
                  instance_compare);
 }
 
-static const char *timespec_string(struct timespec *ts, char *buf) {
+static const char *timeval_string(struct timeval *ts, char *buf,
+                                  size_t bufsize) {
   char *ptr = buf;
   struct tm t;
 
   if (localtime_r(&(ts->tv_sec), &t) == NULL)
     return NULL;
 
-  ptr += strftime(buf, sizeof(buf) - (ptr - buf), "%F %T", &t);
-  ptr += snprintf(ptr, sizeof(buf) - (ptr - buf), ".%09ld", ts->tv_nsec);
+  ptr += strftime(ptr, bufsize - (ptr - buf), "%F %T", &t);
+  ptr += snprintf(ptr, bufsize - (ptr - buf), ".%06ld", ts->tv_usec);
 
   return buf;
 }
@@ -163,7 +154,7 @@ void swim_state_print(SWIM *swim) {
   TRACE("view_size: %d, view_capacity: %d", swim->view_size,
         swim->view_capacity);
 
-  fprintf(stderr, "%-40s %-20s %-10s %-20s %-10s\n", "UUID", "TIME", "STATUS",
+  fprintf(stderr, "%-40s %-26s %-10s %-20s %-10s\n", "UUID", "TIME", "STATUS",
           "ADDRESS", "PORT");
   for (int i = 0; i < swim->view_size; ++i) {
     InstanceState *instance = &swim->view[i];
@@ -176,12 +167,12 @@ void swim_state_print(SWIM *swim) {
 
       uuid_unparse(instance->base.uuid, uuid_buf);
       if (err == 0) {
-        fprintf(stderr, "%-40s %-20s %-10s %-20s %-10s\n", uuid_buf,
-                timespec_string(&instance->base.last_seen, buf),
+        fprintf(stderr, "%-40s %-26s %-10s %-20s %-10s\n", uuid_buf,
+                timeval_string(&instance->base.last_seen, buf, sizeof(buf)),
                 status_name[instance->base.status], host, service);
       } else {
         fprintf(stderr, "%-40s %-20s %-10s\n", uuid_buf,
-                timespec_string(&instance->base.last_seen, buf),
+                timeval_string(&instance->base.last_seen, buf, sizeof(buf)),
                 status_name[instance->base.status]);
       }
     }

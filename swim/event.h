@@ -40,7 +40,7 @@ typedef struct EventHeader {
   size_t event_size;
   EventType type;
   uuid_t uuid;
-  struct timespec time;
+  struct timeval time;
   int gossip_count;
 } EventHeader;
 
@@ -66,10 +66,13 @@ struct LeaveEvent {
 
 /*
  * Instance data that we send out to the cluster.
+ *
+ * TODO: Probably do not need microsecond precision, so swithing to
+ * use just time_t is probably preferrable.
  */
 typedef struct InstanceData {
   uuid_t uuid;
-  struct timespec last_seen;
+  struct timeval last_seen;
   Status status;
   struct sockaddr_storage addr;
   socklen_t addrlen;
