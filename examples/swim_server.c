@@ -10,6 +10,7 @@
 #include <sys/types.h>
 
 #include "swim/cluster.h"
+#include "swim/debug.h"
 #include "swim/defs.h"
 #include "swim/event.h"
 #include "swim/network.h"
@@ -45,8 +46,11 @@ static struct options parse_options(int argc, char *argv[]) {
   char *service = STR(SWIM_DEFAULT_PORTNO);
   char *hostname = NULL;
 
-  while ((opt = getopt(argc, argv, "l:")) != -1) {
+  while ((opt = getopt(argc, argv, "vl:")) != -1) {
     switch (opt) {
+      case 'v':
+        tracing_on = true;
+        break;
       case 'l':
         options.listen_port = atoi(optarg);
         break;
