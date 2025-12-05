@@ -27,7 +27,7 @@ ssize_t swim_send_packet(SWIM *swim, void *buf, size_t buflen,
 
 ssize_t swim_send_event(SWIM *swim, Event *event, struct sockaddr *addr,
                         socklen_t addrlen) {
-  return swim_send_packet(swim, event, event->hdr.event_size, addr, addrlen);
+  return sendto(swim->sockfd, event, event->hdr.event_size, 0, addr, addrlen);
 }
 
 /*
@@ -45,7 +45,7 @@ ssize_t swim_send_ack(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
       event->gossip[i] = swim->view[rand() % swim->view_size].info;
   }
 
-  return swim_send_packet(swim, event, event->hdr.event_size, addr, addrlen);
+  return swim_send_event(swim, event, addr, addrlen);
 }
 
 /*

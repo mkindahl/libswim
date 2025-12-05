@@ -2,6 +2,9 @@
 
 #include <string.h>
 
+#include <sys/param.h>
+
+#include "swim/defs.h"
 #include "swim/event.h"
 #include "swim/network.h"
 
@@ -21,25 +24,30 @@ void swim_cluster_join(SWIM* swim, struct sockaddr* addr, socklen_t addrlen) {
   memcpy(&event.join.join_addr, &swim->addr, sizeof(swim->addr));
   event.join.join_addrlen = sizeof(swim->addr);
 
-  swim_send_packet(swim, &event, sizeof(event), addr, addrlen);
+  swim_send_event(swim, &event, addr, addrlen);
 }
 
 /*
  * Send a leave request to the cluster.
  *
- * This will mark the server as definitely dead.
- *
- * Right now it just sends a single event, but we should probably send
- * leave requests to a subset of the nodes to make sure that it really
- * arrives.
+ * This will mark the server as definitely dead by sending a leave
+ * event to some other nodes.
  *
  * In the event that all leave requests are lost, the cluster will
  * notice that the node does not respond any more and eventually
  * remove it from the cluster.
  */
-void swim_cluster_leave(SWIM* swim, struct sockaddr* addr, socklen_t addrlen) {
+void swim_cluster_leave(SWIM* swim) {
+  const int pos = rand() % swim->view_size;
   Event event;
 
+  if (swim->view_size == 0)
+    return;
+
   swim_event_init(&event, swim->uuid, EVENT_TYPE_LEAVE, sizeof(event));
-  swim_send_packet(swim, &event, sizeof(event), addr, addrlen);
+  for (int i = 0; i < MIN(swim->view_size, SWIM_MAXLEAVE); ++i) {
+    NodeState* node = &swim->view[(pos + i) % swim->view_size];
+    swim_send_event(swim, &event, (struct sockaddr*)&node->info.addr,
+                    node->info.addrlen);
+  }
 }
