@@ -34,7 +34,7 @@ static void swim_process_ping(SWIM *swim, Event *event,
 
   memcpy(&sender.addr, addr, addrlen);
   uuid_copy(sender.uuid, event->hdr.uuid);
-  gettimeofday(&sender.last_seen, NULL);
+  time(&sender.last_seen);
   sender.addrlen = addrlen;
 
   swim_state_add(swim, &sender);
@@ -49,7 +49,7 @@ static void swim_process_ack(SWIM *swim, Event *event,
 
   memcpy(&sender.addr, addr, addrlen);
   uuid_copy(sender.uuid, event->hdr.uuid);
-  gettimeofday(&sender.last_seen, NULL);
+  time(&sender.last_seen);
   sender.addrlen = addrlen;
 
   swim_state_add(swim, &sender);
@@ -124,6 +124,6 @@ void swim_process_event(SWIM *swim, Event *event, size_t bytes,
 
   /* We notice that we have seen the sending server as well, so that we do not
    * need to ping it unnecessarily. */
-  swim_state_update_time(swim, event->hdr.uuid, &event->hdr.time);
+  swim_state_update_time(swim, event->hdr.uuid, event->hdr.time);
   (*info->callback)(swim, event, addr, addrlen);
 }

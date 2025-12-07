@@ -4,6 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -11,9 +13,7 @@
 #include "swim/event.h"
 #include "swim/swim.h"
 
-#include <arpa/inet.h>
 #include <bits/time.h>
-#include <netinet/in.h>
 
 #define BUFSIZE 1024
 
@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
-  gettimeofday(&event.hdr.time, NULL);
+  time(&event.hdr.time);
 
   uuid_generate(event.hdr.uuid);
 

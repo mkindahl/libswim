@@ -23,13 +23,10 @@ typedef enum Status {
 
 /*
  * Instance data that we send out to the cluster.
- *
- * TODO: Probably do not need microsecond precision, so switching to
- * use just time_t is probably preferrable.
  */
 typedef struct NodeInfo {
   uuid_t uuid;
-  struct timeval last_seen;
+  time_t last_seen;
   Status status;
   struct sockaddr_storage addr;
   socklen_t addrlen;

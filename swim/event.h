@@ -27,7 +27,7 @@ typedef struct EventHeader {
   size_t event_size;
   EventType type;
   uuid_t uuid;
-  struct timeval time;
+  time_t time;
   int gossip_count;
 } EventHeader;
 

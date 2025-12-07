@@ -52,6 +52,6 @@ Event* swim_event_create(uuid_t uuid, EventType type, size_t gossip_count) {
 void swim_event_init(Event* event, uuid_t uuid, EventType type, size_t size) {
   event->hdr.type = type;
   event->hdr.event_size = size;
-  gettimeofday(&event->hdr.time, NULL);
+  time(&event->hdr.time);
   uuid_copy(event->hdr.uuid, uuid);
 }

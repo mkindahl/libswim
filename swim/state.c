@@ -74,10 +74,10 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
   return true;
 }
 
-void swim_state_update_time(SWIM *swim, uuid_t uuid, struct timeval *time) {
+void swim_state_update_time(SWIM *swim, uuid_t uuid, time_t time) {
   NodeState *node = swim_state_get(swim, uuid);
-  if (node != NULL && timercmp(&node->info.last_seen, time, <=))
-    memcpy(&node->info.last_seen, time, sizeof(node->info.last_seen));
+  if (node != NULL && node->info.last_seen <= time)
+    node->info.last_seen = time;
 }
 
 /*
@@ -141,16 +141,13 @@ NodeState *swim_state_get(SWIM *swim, uuid_t uuid) {
                  node_compare);
 }
 
-static const char *timeval_string(struct timeval *ts, char *buf,
-                                  size_t bufsize) {
-  char *ptr = buf;
+static const char *time_as_string(time_t time, char *buf, size_t bufsize) {
   struct tm t;
 
-  if (localtime_r(&(ts->tv_sec), &t) == NULL)
+  if (localtime_r(&time, &t) == NULL)
     return NULL;
 
-  ptr += strftime(ptr, bufsize - (ptr - buf), "%F %T", &t);
-  ptr += snprintf(ptr, bufsize - (ptr - buf), ".%06ld", ts->tv_usec);
+  strftime(buf, bufsize, "%F %T", &t);
 
   return buf;
 }
@@ -175,11 +172,11 @@ void swim_state_print(SWIM *swim) {
       uuid_unparse(node->info.uuid, uuid_buf);
       if (err == 0) {
         fprintf(stderr, "%-40s %-26s %-10s %-20s %-10s\n", uuid_buf,
-                timeval_string(&node->info.last_seen, buf, sizeof(buf)),
+                time_as_string(node->info.last_seen, buf, sizeof(buf)),
                 status_name[node->info.status], host, service);
       } else {
         fprintf(stderr, "%-40s %-20s %-10s\n", uuid_buf,
-                timeval_string(&node->info.last_seen, buf, sizeof(buf)),
+                time_as_string(node->info.last_seen, buf, sizeof(buf)),
                 status_name[node->info.status]);
       }
     }
