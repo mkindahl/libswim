@@ -76,7 +76,7 @@ static void swim_process_join(SWIM *swim, Event *event, struct sockaddr *addr,
    * needed since we can receive a rumor that the node has joined as a
    * result of the forwarding above
    */
-  if (swim_state_get(swim, join->join_uuid) != NULL)
+  if (swim_state_get_node(swim, join->join_uuid) != NULL)
     return;
 
   /* Fill in the address if it was not set by the sender */

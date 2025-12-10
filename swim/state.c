@@ -75,7 +75,7 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
 }
 
 void swim_state_update_time(SWIM *swim, uuid_t uuid, time_t time) {
-  NodeState *node = swim_state_get(swim, uuid);
+  NodeState *node = swim_state_get_node(swim, uuid);
   if (node != NULL && node->info.last_seen <= time)
     node->info.last_seen = time;
 }
@@ -102,7 +102,7 @@ void swim_state_add(SWIM *swim, NodeInfo *info) {
   if (uuid_compare(info->uuid, swim->uuid) == 0)
     return;
 
-  if ((existing = swim_state_get(swim, info->uuid))) {
+  if ((existing = swim_state_get_node(swim, info->uuid))) {
     memcpy(&existing->info.last_seen, &info->last_seen,
            sizeof(existing->info.last_seen));
     existing->info.status = SWIM_STATUS_ALIVE;
@@ -121,6 +121,16 @@ void swim_state_add(SWIM *swim, NodeInfo *info) {
   }
 }
 
+/*
+ * Delete an node from the view by marking it dead.
+ *
+ * If an node want to re-join, it need to create a new UUID and
+ * issue a new join message.
+ *
+ * In theory it is possible to add an old UUID if it has been cleaned
+ * up from the view, but since it might not have been cleaned up from
+ * all nodes, this might lead to strange behaviour.
+ */
 void swim_state_del(SWIM *swim, uuid_t uuid) {
   /* We ignore deleting the node itself, if that is passed for some
      reason */
@@ -131,12 +141,12 @@ void swim_state_del(SWIM *swim, uuid_t uuid) {
 }
 
 void swim_state_set_status(SWIM *swim, uuid_t uuid, Status status) {
-  NodeState *node = swim_state_get(swim, uuid);
+  NodeState *node = swim_state_get_node(swim, uuid);
   if (node != NULL)
     node->info.status = status;
 }
 
-NodeState *swim_state_get(SWIM *swim, uuid_t uuid) {
+NodeState *swim_state_get_node(SWIM *swim, uuid_t uuid) {
   return bsearch(uuid, swim->view, swim->view_size, sizeof(NodeState),
                  node_compare);
 }
