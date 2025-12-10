@@ -37,7 +37,7 @@ static void swim_process_ping(SWIM *swim, Event *event,
   sender.addrlen = addrlen;
 
   swim_state_add(swim, &sender);
-  for (int i = 0; i < event->hdr.gossip_count; ++i)
+  for (int i = 0; i < event->gossip_count; ++i)
     swim_state_add(swim, &event->gossip[i]);
 }
 
@@ -52,7 +52,7 @@ static void swim_process_ack(SWIM *swim, Event *event,
   sender.addrlen = addrlen;
 
   swim_state_add(swim, &sender);
-  for (int i = 0; i < event->hdr.gossip_count; ++i)
+  for (int i = 0; i < event->gossip_count; ++i)
     swim_state_add(swim, &event->gossip[i]);
 }
 

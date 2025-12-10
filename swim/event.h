@@ -28,7 +28,6 @@ typedef struct EventHeader {
   EventType type;
   uuid_t uuid;
   time_t time;
-  int gossip_count;
 } EventHeader;
 
 struct PingEvent {
@@ -69,6 +68,7 @@ typedef struct Event {
     struct LeaveEvent leave;
   };
 
+  int gossip_count;
   NodeInfo gossip[];
 } Event;
 

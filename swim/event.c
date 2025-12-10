@@ -44,7 +44,7 @@ Event* swim_event_create(uuid_t uuid, EventType type, size_t gossip_count) {
   memset(event, 0, event_size);
 
   swim_event_init(event, uuid, type, event_size);
-  event->hdr.gossip_count = gossip_count;
+  event->gossip_count = gossip_count;
 
   return event;
 }
