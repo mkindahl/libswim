@@ -1,3 +1,10 @@
+/*
+ * Cluster operations.
+ *
+ * This module deals with cluster operations such as joining and
+ * leaving the cluster, sending out heartbeat, and dealing with
+ * suspected dead or declared dead nodes.
+ */
 #ifndef SWIM_CLUSTER_H_
 #define SWIM_CLUSTER_H_
 

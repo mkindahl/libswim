@@ -32,6 +32,8 @@ typedef struct NodeInfo {
   socklen_t addrlen;
 } NodeInfo;
 
-extern void swim_nodeinfo_copy(NodeInfo* dst, NodeInfo* src);
+extern void swim_node_init(NodeInfo* node, uuid_t uuid, struct sockaddr* addr,
+                           socklen_t addrlen);
+extern void swim_node_copy(NodeInfo* dst, NodeInfo* src);
 
 #endif /* SWIM_NODE_H_ */

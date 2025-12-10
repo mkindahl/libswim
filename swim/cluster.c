@@ -14,6 +14,9 @@
  * This will send a join request to the provided address. It does not
  * wait for an ACK since the main server loop will deal with any
  * incoming messages, including an ACK, and process it accordingly.
+ *
+ * We mark the address of ourselves as unknown since this will be
+ * figured out by the receiving node.
  */
 void swim_cluster_join(SWIM* swim, struct sockaddr* addr, socklen_t addrlen) {
   Event event;
@@ -21,8 +24,7 @@ void swim_cluster_join(SWIM* swim, struct sockaddr* addr, socklen_t addrlen) {
   swim_event_init(&event, swim->uuid, EVENT_TYPE_JOIN, sizeof(event));
 
   uuid_copy(event.join.join_uuid, swim->uuid);
-  memcpy(&event.join.join_addr, &swim->addr, sizeof(swim->addr));
-  event.join.join_addrlen = sizeof(swim->addr);
+  event.join.join_addrlen = 0;
 
   swim_send_event(swim, &event, addr, addrlen);
 }

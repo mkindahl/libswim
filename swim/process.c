@@ -7,9 +7,8 @@
 
 #include "process.h"
 
+#include <assert.h>
 #include <netdb.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <sys/socket.h>
@@ -70,16 +69,37 @@ static void swim_process_ack(SWIM *swim, Event *event,
 static void swim_process_join(SWIM *swim, Event *event, struct sockaddr *addr,
                               socklen_t addrlen) {
   struct JoinEvent *join = &event->join;
-  NodeInfo node = {
-      .last_seen = event->hdr.time,
-      .status = SWIM_STATUS_ALIVE,
-  };
+  NodeInfo info;
 
-  node.addrlen = addrlen;
-  memcpy(&node.addr, addr, addrlen);
-  uuid_copy(node.uuid, join->join_uuid);
+  /*
+   * We skip adding the node if we have already added it. This is
+   * needed since we can receive a rumor that the node has joined as a
+   * result of the forwarding above
+   */
+  if (swim_state_get(swim, join->join_uuid) != NULL)
+    return;
 
-  swim_state_add(swim, &node);
+  /* Fill in the address if it was not set by the sender */
+  if (event->join.join_addrlen == 0) {
+    event->join.join_addrlen = addrlen;
+    memcpy(&event->join.join_addr, addr, addrlen);
+  }
+
+  swim_node_init(&info, join->join_uuid, (struct sockaddr *)&join->join_addr,
+                 join->join_addrlen);
+  info.status = SWIM_STATUS_ALIVE;
+  info.last_seen = event->hdr.time;
+
+  assert(info.last_seen > 0 && info.status != SWIM_STATUS_UNKNOWN);
+
+  swim_state_add(swim, &info);
+
+  for (int i = 0; i < swim->view_size; ++i) {
+    NodeState *node = &swim->view[i];
+    swim_send_event(swim, event, (struct sockaddr *)&node->info.addr,
+                    swim->view[i].info.addrlen);
+  }
+
   swim_send_ack(swim, addr, addrlen);
 }
 
