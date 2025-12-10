@@ -8,7 +8,11 @@ find_library(UUID_LIBRARY NAMES uuid)
 
 message(STATUS "UUID_LIBRARY: ${UUID_LIBRARY}")
 
-add_compile_options(-Wall -Wextra -Wpedantic)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS ON)
+
+add_compile_options(-Wall -Wextra)
 
 # Include binary directory to access generated files, e.g., config.h
 include_directories(${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
