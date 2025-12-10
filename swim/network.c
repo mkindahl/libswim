@@ -1,7 +1,8 @@
 #include "network.h"
 
+#include <assert.h>
+#include <memory.h>
 #include <netdb.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 #include <sys/param.h>
@@ -10,6 +11,26 @@
 #include "swim/defs.h"
 #include "swim/event.h"
 #include "swim/utils.h"
+
+static void cleanup_free(void *ptr) {
+  void **p = (void **)ptr;
+  free(*p);
+}
+
+/*
+ * Helper function to attach gossip to an event.
+ */
+static void swim_fill_gossip(SWIM *swim, Event *event, int count) {
+  assert(event->gossip_count >= count);
+  if (swim->view_size < SWIM_MAXGOSSIP) {
+    for (int i = 0; i < swim->view_size; ++i)
+      swim_node_copy(&event->gossip[i], &swim->view[i].info);
+  } else {
+    for (int i = 0; i < count; ++i)
+      swim_node_copy(&event->gossip[i],
+                     &swim->view[rand() % swim->view_size].info);
+  }
+}
 
 ssize_t swim_recv_packet(SWIM *swim, void *buf, size_t buflen,
                          struct sockaddr *addr, socklen_t addrlen) {
@@ -34,16 +55,15 @@ ssize_t swim_send_event(SWIM *swim, Event *event, struct sockaddr *addr,
  * Helper function to send ACK.
  */
 ssize_t swim_send_ack(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
+  char addrbuf[NI_MAXHOST + NI_MAXSERV + 1];
   const int gossip_count = MIN(swim->view_size, SWIM_MAXGOSSIP);
-  Event *event = swim_event_create(swim->uuid, EVENT_TYPE_ACK, gossip_count);
+  __attribute__((cleanup(cleanup_free))) Event *event =
+      swim_event_create(swim->uuid, EVENT_TYPE_ACK, gossip_count);
 
-  if (swim->view_size < SWIM_MAXGOSSIP) {
-    for (int i = 0; i < swim->view_size; ++i)
-      event->gossip[i] = swim->view[i].info;
-  } else {
-    for (int i = 0; i < gossip_count; ++i)
-      event->gossip[i] = swim->view[rand() % swim->view_size].info;
-  }
+  TRACE("Sending ACK with gossip of size %d to %s", gossip_count,
+        addr2str_r(addr, addrlen, addrbuf, sizeof(addrbuf)));
+
+  swim_fill_gossip(swim, event, gossip_count);
 
   return swim_send_event(swim, event, addr, addrlen);
 }
@@ -52,24 +72,14 @@ ssize_t swim_send_ack(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
  * Helper function to send PING.
  */
 ssize_t swim_send_ping(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
-  ssize_t result;
   char buf[128] = {0};
   const int gossip_count = MIN(swim->view_size, SWIM_MAXGOSSIP);
-  Event *event = swim_event_create(swim->uuid, EVENT_TYPE_PING, gossip_count);
+  Event *event __attribute__((cleanup(cleanup_free))) =
+      swim_event_create(swim->uuid, EVENT_TYPE_PING, gossip_count);
 
   TRACE("sending ping to %s", addr2str_r(addr, addrlen, buf, sizeof(buf)));
 
-  if (swim->view_size < SWIM_MAXGOSSIP) {
-    for (int i = 0; i < swim->view_size; ++i)
-      event->gossip[i] = swim->view[i].info;
-  } else {
-    for (int i = 0; i < gossip_count; ++i)
-      event->gossip[i] = swim->view[rand() % swim->view_size].info;
-  }
+  swim_fill_gossip(swim, event, gossip_count);
 
-  result = swim_send_event(swim, event, addr, addrlen);
-
-  free(event);
-
-  return result;
+  return swim_send_event(swim, event, addr, addrlen);
 }
