@@ -81,6 +81,40 @@ void swim_state_update_time(SWIM *swim, uuid_t uuid, time_t time) {
 }
 
 /*
+ * Merge node info into the state.
+ *
+ * This is used to merge the status when processing gossip.
+ */
+
+void swim_state_merge(SWIM *swim, NodeInfo *info) {
+  NodeState *node;
+
+  if (uuid_compare(info->uuid, swim->uuid) == 0)
+    return;
+
+  node = swim_state_get_node(swim, info->uuid);
+
+  if (node == NULL) {
+    swim_state_add(swim, info);
+  } else {
+    switch (node->info.status) {
+      case SWIM_STATUS_ALIVE:
+      case SWIM_STATUS_SUSPECT:
+        if (node->info.last_seen < info->last_seen) {
+          node->info.last_seen = info->last_seen;
+          node->info.status = SWIM_STATUS_ALIVE;
+        }
+        break;
+
+      case SWIM_STATUS_DEAD:
+      case SWIM_STATUS_UNKNOWN:
+      default:
+        break;
+    }
+  }
+}
+
+/*
  * Add or update a node to the state view.
  *
  * If the node is already in the view, we just update the timestamp

@@ -20,6 +20,39 @@
 #include "swim/utils.h"
 
 /*
+ * Process all gossip piggybacked on another event.
+ */
+static void swim_process_gossip(SWIM *swim, NodeInfo *gossip, int count) {
+  for (int i = 0; i < count; ++i) {
+    NodeInfo *info = &gossip[i];
+    assert(info->last_seen > 0 && info->status != SWIM_STATUS_UNKNOWN);
+
+    /*
+     * If node is declared dead and see this gossip, it will exit for
+     * now.
+     *
+     * TODO(mkindahl): Generate a new UUID and re-join the cluster.
+     */
+    switch (info->status) {
+      case SWIM_STATUS_DEAD:
+        if (uuid_compare(info->uuid, swim->uuid) == 0) {
+          char buf[40];
+          uuid_unparse(swim->uuid, buf);
+          fprintf(stderr, "Node %s was declared dead, exiting\n", buf);
+          exit(EXIT_FAILURE);
+        }
+
+      case SWIM_STATUS_ALIVE:
+      case SWIM_STATUS_SUSPECT:
+      case SWIM_STATUS_UNKNOWN:
+        break;
+    }
+
+    swim_state_merge(swim, info);
+  }
+}
+
+/*
  * Process the reception of a PING message.
  *
  * We just respond that we are alive.
@@ -37,8 +70,7 @@ static void swim_process_ping(SWIM *swim, Event *event,
   sender.addrlen = addrlen;
 
   swim_state_add(swim, &sender);
-  for (int i = 0; i < event->gossip_count; ++i)
-    swim_state_add(swim, &event->gossip[i]);
+  swim_process_gossip(swim, event->gossip, event->gossip_count);
 }
 
 static void swim_process_ack(SWIM *swim, Event *event,
@@ -52,8 +84,7 @@ static void swim_process_ack(SWIM *swim, Event *event,
   sender.addrlen = addrlen;
 
   swim_state_add(swim, &sender);
-  for (int i = 0; i < event->gossip_count; ++i)
-    swim_state_add(swim, &event->gossip[i]);
+  swim_process_gossip(swim, event->gossip, event->gossip_count);
 }
 
 /*
