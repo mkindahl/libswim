@@ -6,6 +6,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
@@ -15,9 +17,6 @@
 #include "swim/event.h"
 #include "swim/network.h"
 #include "swim/process.h"
-
-#include <arpa/inet.h>
-#include <netinet/in.h>
 
 #define STR(X) EXPAND(X)
 #define EXPAND(X) #X
@@ -115,9 +114,7 @@ static void server_loop(SWIM *swim) {
     if (bytes > 0) {
       swim_process_event(swim, event, bytes, addr, addrlen);
     } else if (swim->view_size > 0) {
-      NodeState *node = &swim->view[rand() % swim->view_size];
-      swim_send_ping(swim, (struct sockaddr *)&node->info.addr,
-                     node->info.addrlen);
+      swim_cluster_heartbeat(swim);
     }
 
     swim_state_print(swim);

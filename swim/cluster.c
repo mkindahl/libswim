@@ -53,3 +53,12 @@ void swim_cluster_leave(SWIM* swim) {
                     node->info.addrlen);
   }
 }
+
+/*
+ * Ping a node in the cluster directly.
+ */
+void swim_cluster_heartbeat(SWIM* swim) {
+  NodeState* target = &swim->view[rand() % swim->view_size];
+  swim_send_ping(swim, (struct sockaddr*)&target->info.addr,
+                 target->info.addrlen);
+}

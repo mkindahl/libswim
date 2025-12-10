@@ -15,5 +15,6 @@
 extern void swim_cluster_join(SWIM* swim, struct sockaddr* addr,
                               socklen_t addrlen);
 extern void swim_cluster_leave(SWIM* swim);
+extern void swim_cluster_heartbeat(SWIM* swim);
 
 #endif /* SWIM_CLUSTER_H_ */
