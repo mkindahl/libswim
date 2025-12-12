@@ -96,7 +96,7 @@ typedef struct Event {
     struct LeaveEvent leave;
   };
 
-  int gossip_count;
+  uint16_t gossip_count;
   NodeInfo gossip[];
 } Event;
 

@@ -86,7 +86,7 @@ Event* swim_event_create(uuid_t uuid, EventType type, size_t gossip_count) {
   const size_t event_size = sizeof(Event) + gossip_count * sizeof(NodeInfo);
   Event* event = malloc(event_size);
 
-  assert(event_size < SWIM_MAXPACKET);
+  assert(event_size < SWIM_MAX_PACKET_SIZE);
 
   memset(event, 0, event_size);
 
