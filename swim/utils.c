@@ -23,3 +23,9 @@ const char *swim_addr_str(struct sockaddr *addr, socklen_t addrlen) {
   static char buf[NI_MAXHOST + NI_MAXSERV + 2];
   return swim_addr_str_r(addr, addrlen, buf, sizeof(buf));
 }
+
+extern const char *swim_uuid_str(uuid_t uuid) {
+  static char buf[40];
+  uuid_unparse(uuid, buf);
+  return buf;
+}

@@ -24,18 +24,15 @@
  * Process all gossip piggybacked on another event.
  */
 static void swim_process_gossip(SWIM *swim, NodeInfo *gossip, int count) {
-  char uuid_buf[40];
-
-  uuid_unparse(swim->uuid, uuid_buf);
-  TRACE("self uuid %s", uuid_buf);
+  TRACE("self uuid %s", swim_uuid_str(swim->uuid));
 
   for (int i = 0; i < count; ++i) {
     NodeInfo *info = &gossip[i];
 
     assert(info->last_seen > 0 && info->status != SWIM_STATUS_UNKNOWN);
 
-    uuid_unparse(info->uuid, uuid_buf);
-    TRACE("uuid %s status %s", uuid_buf, swim_status_name(info->status));
+    TRACE("uuid %s status %s", swim_uuid_str(info->uuid),
+          swim_status_name(info->status));
 
     /*
      * If node is declared dead and see this gossip, it will exit for
@@ -46,9 +43,8 @@ static void swim_process_gossip(SWIM *swim, NodeInfo *gossip, int count) {
     switch (info->status) {
       case SWIM_STATUS_DEAD:
         if (uuid_compare(info->uuid, swim->uuid) == 0) {
-          char buf[40];
-          uuid_unparse(info->uuid, buf);
-          fprintf(stderr, "Node %s declared dead, exiting\n", buf);
+          fprintf(stderr, "Node %s declared dead, exiting\n",
+                  swim_uuid_str(info->uuid));
           exit(EXIT_FAILURE);
         }
         break;
@@ -246,11 +242,9 @@ static process_callback_t *swim_event_processing[] = {
 
 void swim_process_event(SWIM *swim, Event *event, size_t bytes,
                         struct sockaddr *addr, socklen_t addrlen) {
-  char uuidbuf[40];
   process_callback_t *callback = swim_event_processing[event->hdr.type];
 
-  uuid_unparse(event->hdr.uuid, uuidbuf);
-  LOG("node %s addr %s (%lu bytes) -> %s", uuidbuf,
+  LOG("node %s addr %s (%lu bytes) -> %s", swim_uuid_str(event->hdr.uuid),
       swim_addr_str(addr, addrlen), bytes, swim_event_print(event));
 
   /*

@@ -38,7 +38,6 @@ static int node_compare(const void *pkey, const void *pnode) {
 
 bool swim_state_init(SWIM *swim, uint16_t port) {
   struct sockaddr_in serveraddr;
-  char uuid_buf[40];
   int err, fd;
   ssize_t res;
   struct timeval timeout = {.tv_sec = 10, .tv_usec = 0};
@@ -72,8 +71,8 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
   time(&swim->last_heartbeat);
   uuid_generate(swim->uuid);
 
-  uuid_unparse(swim->uuid, uuid_buf);
-  TRACE("initialized server with UUID %s to listen on %s", uuid_buf,
+  TRACE("initialized server with UUID %s to listen on %s",
+        swim_uuid_str(swim->uuid),
         swim_addr_str((struct sockaddr *)&serveraddr, sizeof(serveraddr)));
 
   return true;
@@ -241,10 +240,7 @@ static const char *time_as_string(time_t time, char *buf, size_t bufsize) {
 }
 
 void swim_state_print(SWIM *swim) {
-  char uuid_buf[40];
-
-  uuid_unparse(swim->uuid, uuid_buf);
-  fprintf(stderr, "UUID: %s\n", uuid_buf);
+  fprintf(stderr, "UUID: %s\n", swim_uuid_str(swim->uuid));
   fprintf(stderr, "%-40s %-26s %-10s %-20s %-20s\n", "UUID", "LAST_SEEN",
           "STATUS", "ADDRESS", "WITNESS");
   for (int i = 0; i < swim->view_size; ++i) {
@@ -253,8 +249,6 @@ void swim_state_print(SWIM *swim) {
     if (node) {
       char buf[128], host[NI_MAXHOST], service[NI_MAXSERV];
       int err;
-
-      uuid_unparse(node->info.uuid, uuid_buf);
 
       err = getnameinfo((struct sockaddr *)&node->info.addr, node->info.addrlen,
                         host, NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICSERV);
@@ -268,11 +262,12 @@ void swim_state_print(SWIM *swim) {
           swim_addr_str((struct sockaddr *)&node->witness.addr,
                         node->witness.addrlen);
 
-        fprintf(stderr, "%-40s %-26s %-10s %-20s %-20s\n", uuid_buf,
+        fprintf(stderr, "%-40s %-26s %-10s %-20s %-20s\n",
+                swim_uuid_str(node->info.uuid),
                 time_as_string(node->info.last_seen, buf, sizeof(buf)),
                 status_name[node->info.status], addrbuf, witbuf);
       } else {
-        fprintf(stderr, "%-40s %-20s %-10s\n", uuid_buf,
+        fprintf(stderr, "%-40s %-20s %-10s\n", swim_uuid_str(node->info.uuid),
                 time_as_string(node->info.last_seen, buf, sizeof(buf)),
                 status_name[node->info.status]);
       }
