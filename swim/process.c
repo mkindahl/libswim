@@ -73,12 +73,6 @@ static void swim_process_ping(SWIM *swim, Event *event,
   swim_process_gossip(swim, event->gossip, event->gossip_count);
 }
 
-static int swim_print_ping(__attribute__((unused)) SWIM *swim,
-                           __attribute__((unused)) Event *event, char *buf,
-                           size_t buflen) {
-  return snprintf(buf, buflen, "PING");
-}
-
 static void swim_process_ack(SWIM *swim, Event *event,
                              __attribute__((__unused__)) struct sockaddr *addr,
                              __attribute__((__unused__)) socklen_t addrlen) {
@@ -91,12 +85,6 @@ static void swim_process_ack(SWIM *swim, Event *event,
 
   swim_state_add(swim, &sender);
   swim_process_gossip(swim, event->gossip, event->gossip_count);
-}
-
-static int swim_print_ack(__attribute__((unused)) SWIM *swim,
-                          __attribute__((unused)) Event *event, char *buf,
-                          size_t buflen) {
-  return snprintf(buf, buflen, "ACK");
 }
 
 /*
@@ -146,21 +134,6 @@ static void swim_process_join(SWIM *swim, Event *event, struct sockaddr *addr,
   swim_send_ack(swim, addr, addrlen);
 }
 
-static int swim_print_join(__attribute__((unused)) SWIM *swim, Event *event,
-                           char *buf, size_t buflen) {
-  char uuidbuf[40];
-  char addrbuf[NI_MAXHOST + NI_MAXSERV + 1];
-
-  uuid_unparse(event->join.join_uuid, uuidbuf);
-  if (event->join.join_addrlen > 0)
-    return snprintf(
-        buf, buflen, "JOIN(%s, %s)", uuidbuf,
-        addr2str_r((struct sockaddr *)&event->join.join_addr,
-                   event->join.join_addrlen, addrbuf, sizeof(addrbuf)));
-  else
-    return snprintf(buf, buflen, "JOIN(%s)", uuidbuf);
-}
-
 /*
  * Process the reception of an LEAVE message.
  *
@@ -179,79 +152,38 @@ static void swim_process_leave(SWIM *swim, Event *event, struct sockaddr *addr,
   swim_send_ack(swim, addr, addrlen);
 }
 
-static int swim_print_leave(__attribute__((unused)) SWIM *swim, Event *event,
-                            char *buf, size_t buflen) {
-  char uuidbuf[40];
-  uuid_unparse(event->leave.leave_uuid, uuidbuf);
-  return snprintf(buf, buflen, "LEAVE(%s)", uuidbuf);
-}
-
 /*
  * Event callback type.
  *
  * The callback is passed the SWIM state, the event being received,
  * and the address of the sender as seen by recvfrom().
  */
-typedef void event_callback_t(SWIM *swim, Event *event, struct sockaddr *addr,
-                              socklen_t addrlen);
-typedef int print_callback_t(SWIM *swim, Event *event, char *buf,
-                             size_t buflen);
-
-typedef struct EventInfo {
-  const char *name;
-  print_callback_t *print;
-  event_callback_t *callback;
-} EventInfo;
+typedef void process_callback_t(SWIM *swim, Event *event, struct sockaddr *addr,
+                                socklen_t addrlen);
 
 /*
  * Event dispatch structure with information about all events.
  */
-static struct EventInfo swim_event_processing[] = {
-    [EVENT_TYPE_PING] =
-        {
-            .name = "PING",
-            .callback = swim_process_ping,
-            .print = swim_print_ping,
-        },
-    [EVENT_TYPE_ACK] =
-        {
-            .name = "ACK",
-            .callback = swim_process_ack,
-            .print = swim_print_ack,
-        },
-    [EVENT_TYPE_JOIN] =
-        {
-            .name = "JOIN",
-            .callback = swim_process_join,
-            .print = swim_print_join,
-        },
-    [EVENT_TYPE_LEAVE] =
-        {
-            .name = "LEAVE",
-            .callback = swim_process_leave,
-            .print = swim_print_leave,
-        },
+static process_callback_t *swim_event_processing[] = {
+    [EVENT_TYPE_PING] = swim_process_ping,
+    [EVENT_TYPE_ACK] = swim_process_ack,
+    [EVENT_TYPE_JOIN] = swim_process_join,
+    [EVENT_TYPE_LEAVE] = swim_process_leave,
 };
-
-#define PRINT_EVENT(SWIM, INFO, EVENT)                             \
-  ({                                                               \
-    static char _buf[128] = {0};                                   \
-    if ((INFO)->print)                                             \
-      (void)(*(INFO)->print)((SWIM), (EVENT), _buf, sizeof(_buf)); \
-    _buf;                                                          \
-  })
 
 void swim_process_event(SWIM *swim, Event *event, size_t bytes,
                         struct sockaddr *addr, socklen_t addrlen) {
   char buf[NI_MAXHOST + NI_MAXSERV + 1];
-  EventInfo *info = &swim_event_processing[event->hdr.type];
+  char uuidbuf[40];
+  process_callback_t *callback = swim_event_processing[event->hdr.type];
 
-  TRACE("Got %s of %zd bytes from %s: %s", info->name, bytes,
-        addr2str_r(addr, addrlen, buf, sizeof(buf)),
-        PRINT_EVENT(swim, info, event));
+  uuid_unparse(event->hdr.uuid, uuidbuf);
+  LOG("node %s addr %s (%lu bytes) -> %s", uuidbuf,
+      addr2str_r(addr, addrlen, buf, sizeof(buf)), bytes,
+      swim_event_print(event));
 
   /* We notice that we have seen the sending server as well, so that we do not
    * need to ping it unnecessarily. */
   swim_state_update_time(swim, event->hdr.uuid, event->hdr.time);
-  (*info->callback)(swim, event, addr, addrlen);
+  (*callback)(swim, event, addr, addrlen);
 }

@@ -1,10 +1,12 @@
-#include "swim/event.h"
+#include "event.h"
 
 #include <assert.h>
 #include <memory.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include <sys/socket.h>
 
 #include "swim/defs.h"
 #include "swim/network.h"
