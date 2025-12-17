@@ -20,12 +20,16 @@
 typedef enum EventType {
   EVENT_TYPE_PING,
   EVENT_TYPE_ACK,
+  EVENT_TYPE_PING_REQ,
 
   /* Rumor events */
   EVENT_TYPE_JOIN = 16,
   EVENT_TYPE_LEAVE,
 } EventType;
 
+/*
+ * Struct: EventHeader
+ */
 typedef struct EventHeader {
   uint8_t version;     /* Event format version */
   uint32_t event_size; /* Size of the event */
@@ -38,10 +42,29 @@ struct PingEvent {
   EventHeader hdr;
 };
 
-struct AckEvent {
+struct PingReqEvent {
   EventHeader hdr;
+  uuid_t ping_req_uuid;
 };
 
+/*
+ * Struct: Acknowledge event
+ *
+ * The acknowledge event can be related to an arbitrary node and can
+ * either be the response to a PING event or a PING_REQ event.
+ */
+struct AckEvent {
+  EventHeader hdr;
+  uuid_t ack_uuid;
+};
+
+/*
+ * Join event.
+ *
+ * The node sending out the join event usually do not know it's
+ * address, but this is filled in before forwarding the join event to
+ * the rest of the cluster.
+ */
 struct JoinEvent {
   EventHeader hdr;
   uuid_t join_uuid;
@@ -67,6 +90,7 @@ typedef struct Event {
   union {
     EventHeader hdr;
     struct PingEvent ping;
+    struct PingReqEvent ping_req;
     struct AckEvent ack;
     struct JoinEvent join;
     struct LeaveEvent leave;

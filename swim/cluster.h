@@ -16,5 +16,8 @@ extern void swim_cluster_join(SWIM* swim, struct sockaddr* addr,
                               socklen_t addrlen);
 extern void swim_cluster_leave(SWIM* swim);
 extern void swim_cluster_heartbeat(SWIM* swim);
+extern void swim_cluster_suspect_dead(SWIM* swim, NodeState* node);
+extern void swim_cluster_declare_dead(SWIM* swim, NodeState* node);
+extern void swim_cluster_refuted_dead(SWIM* swim, NodeState* node);
 
 #endif /* SWIM_CLUSTER_H_ */

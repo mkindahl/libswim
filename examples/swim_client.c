@@ -78,6 +78,14 @@ int main(int argc, char **argv) {
 
   if (strcmp(argv[2], "ping") == 0) {
     event.hdr.type = EVENT_TYPE_PING;
+  } else if (strcmp(argv[2], "ping_req") == 0) {
+    event.hdr.type = EVENT_TYPE_PING_REQ;
+    if (argc > 3)
+      uuid_parse(argv[3], event.ping_req.ping_req_uuid);
+    else {
+      fprintf(stderr, "need a UUID\n");
+      exit(EXIT_FAILURE);
+    }
   } else if (strcmp(argv[2], "ack") == 0) {
     event.hdr.type = EVENT_TYPE_ACK;
   } else if (strcmp(argv[2], "join") == 0) {

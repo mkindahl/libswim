@@ -22,3 +22,17 @@ void swim_node_copy(NodeInfo* dst, NodeInfo* src) {
   memcpy(&dst->addr, &src->addr, src->addrlen);
   memcpy(&dst->last_seen, &src->last_seen, sizeof(src->last_seen));
 }
+
+bool swim_node_has_witness(NodeState* node) {
+  return (node->witness.addrlen > 0);
+}
+
+void swim_node_reset(NodeState* node) {
+  node->ping_time = 0;
+  node->suspect_time = 0;
+  memset(&node->witness, 0, sizeof(node->witness));
+}
+
+void swim_node_reset_witness(NodeState* node) {
+  memset(&node->witness, 0, sizeof(node->witness));
+}

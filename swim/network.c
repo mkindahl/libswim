@@ -22,13 +22,23 @@ static void cleanup_free(void *ptr) {
  */
 static void swim_fill_gossip(SWIM *swim, Event *event, int count) {
   assert(event->gossip_count >= count);
-  if (swim->view_size < SWIM_MAXGOSSIP) {
-    for (int i = 0; i < swim->view_size; ++i)
+  if (swim->view_size < SWIM_MAX_GOSSIP_SIZE) {
+    for (int i = 0; i < swim->view_size; ++i) {
+      char uuid_buf[40];
       swim_node_copy(&event->gossip[i], &swim->view[i].info);
+      uuid_unparse(event->gossip[i].uuid, uuid_buf);
+      TRACE("uuid %s state %s", uuid_buf,
+            swim_status_name(event->gossip[i].status));
+    }
   } else {
-    for (int i = 0; i < count; ++i)
+    for (int i = 0; i < count; ++i) {
+      char uuid_buf[40];
       swim_node_copy(&event->gossip[i],
                      &swim->view[rand() % swim->view_size].info);
+      uuid_unparse(event->gossip[i].uuid, uuid_buf);
+      TRACE("uuid %s state %s", uuid_buf,
+            swim_status_name(event->gossip[i].status));
+    }
   }
 }
 
@@ -60,13 +70,18 @@ ssize_t swim_send_event(SWIM *swim, Event *event, struct sockaddr *addr,
 /*
  * Helper function to send ACK.
  */
-ssize_t swim_send_ack(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
+ssize_t swim_send_ack(SWIM *swim, uuid_t uuid, struct sockaddr *addr,
+                      socklen_t addrlen) {
   char addrbuf[NI_MAXHOST + NI_MAXSERV + 1];
-  const int gossip_count = MIN(swim->view_size, SWIM_MAXGOSSIP);
-  __attribute__((cleanup(cleanup_free))) Event *event =
+  char uuid_buf[40];
+  const int gossip_count = MIN(swim->view_size, SWIM_MAX_GOSSIP_SIZE);
+  Event *event __attribute__((cleanup(cleanup_free))) =
       swim_event_create(swim->uuid, EVENT_TYPE_ACK, gossip_count);
 
-  TRACE("Sending ACK with gossip of size %d to %s", gossip_count,
+  uuid_copy(event->ack.ack_uuid, uuid);
+
+  uuid_unparse(swim->uuid, uuid_buf);
+  TRACE("from %s gossip of size %d to %s", uuid_buf, gossip_count,
         addr2str_r(addr, addrlen, addrbuf, sizeof(addrbuf)));
 
   swim_fill_gossip(swim, event, gossip_count);
@@ -79,11 +94,33 @@ ssize_t swim_send_ack(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
  */
 ssize_t swim_send_ping(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
   char buf[128] = {0};
-  const int gossip_count = MIN(swim->view_size, SWIM_MAXGOSSIP);
+  const int gossip_count = MIN(swim->view_size, SWIM_MAX_GOSSIP_SIZE);
   Event *event __attribute__((cleanup(cleanup_free))) =
       swim_event_create(swim->uuid, EVENT_TYPE_PING, gossip_count);
 
   TRACE("sending ping to %s", addr2str_r(addr, addrlen, buf, sizeof(buf)));
+
+  swim_fill_gossip(swim, event, gossip_count);
+
+  return swim_send_event(swim, event, addr, addrlen);
+}
+
+/*
+ * Helper function to send PING_REQ.
+ */
+ssize_t swim_send_ping_req(SWIM *swim, uuid_t target_uuid,
+                           struct sockaddr *addr, socklen_t addrlen) {
+  char addrbuf[128] = {0};
+  char uuidbuf[40];
+  const int gossip_count = MIN(swim->view_size, SWIM_MAX_GOSSIP_SIZE);
+  Event *event __attribute__((cleanup(cleanup_free))) =
+      swim_event_create(swim->uuid, EVENT_TYPE_PING_REQ, gossip_count);
+
+  uuid_copy(event->ping_req.ping_req_uuid, target_uuid);
+
+  uuid_unparse(target_uuid, uuidbuf);
+  TRACE("sending ping_req for node %s to %s", uuidbuf,
+        addr2str_r(addr, addrlen, addrbuf, sizeof(addrbuf)));
 
   swim_fill_gossip(swim, event, gossip_count);
 

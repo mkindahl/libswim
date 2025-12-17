@@ -18,9 +18,18 @@ static int swim_print_ping(__attribute__((unused)) Event* event, char* buf,
   return snprintf(buf, buflen, "PING");
 }
 
-static int swim_print_ack(__attribute__((unused)) Event* event, char* buf,
-                          size_t buflen) {
-  return snprintf(buf, buflen, "ACK");
+static int swim_print_ack(Event* event, char* buf, size_t buflen) {
+  char uuid_buf[40];
+
+  uuid_unparse(event->ack.ack_uuid, uuid_buf);
+  return snprintf(buf, buflen, "ACK(%s)", uuid_buf);
+}
+
+static int swim_print_ping_req(Event* event, char* buf, size_t buflen) {
+  char uuid_buf[40];
+
+  uuid_unparse(event->ping_req.ping_req_uuid, uuid_buf);
+  return snprintf(buf, buflen, "PING_REQ(%s)", uuid_buf);
 }
 
 static int swim_print_join(Event* event, char* buf, size_t buflen) {
@@ -48,6 +57,7 @@ static int swim_print_leave(Event* event, char* buf, size_t buflen) {
  */
 static print_callback_t* swim_event[] = {
     [EVENT_TYPE_PING] = swim_print_ping,
+    [EVENT_TYPE_PING_REQ] = swim_print_ping_req,
     [EVENT_TYPE_ACK] = swim_print_ack,
     [EVENT_TYPE_JOIN] = swim_print_join,
     [EVENT_TYPE_LEAVE] = swim_print_leave,

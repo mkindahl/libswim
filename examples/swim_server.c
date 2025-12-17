@@ -115,12 +115,13 @@ static void server_loop(SWIM *swim) {
     Event *event = (Event *)buf;
 
     bytes = swim_recv_packet(swim, buf, sizeof(buf), addr, addrlen);
-    if (bytes > 0) {
+    if (bytes > 0)
       swim_process_event(swim, event, bytes, addr, addrlen);
-    } else if (swim->view_size > 0) {
-      swim_cluster_heartbeat(swim);
-    }
 
-    swim_state_print(swim);
+    swim_cluster_heartbeat(swim);
+
+    /* We had a timeout, so print the current state. */
+    if (bytes <= 0)
+      swim_state_print(swim);
   }
 }

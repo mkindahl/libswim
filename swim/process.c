@@ -14,6 +14,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 
+#include "swim/cluster.h"
 #include "swim/debug.h"
 #include "swim/event.h"
 #include "swim/network.h"
@@ -23,9 +24,18 @@
  * Process all gossip piggybacked on another event.
  */
 static void swim_process_gossip(SWIM *swim, NodeInfo *gossip, int count) {
+  char uuid_buf[40];
+
+  uuid_unparse(swim->uuid, uuid_buf);
+  TRACE("self uuid %s", uuid_buf);
+
   for (int i = 0; i < count; ++i) {
     NodeInfo *info = &gossip[i];
+
     assert(info->last_seen > 0 && info->status != SWIM_STATUS_UNKNOWN);
+
+    uuid_unparse(info->uuid, uuid_buf);
+    TRACE("uuid %s status %s", uuid_buf, swim_status_name(info->status));
 
     /*
      * If node is declared dead and see this gossip, it will exit for
@@ -37,10 +47,11 @@ static void swim_process_gossip(SWIM *swim, NodeInfo *gossip, int count) {
       case SWIM_STATUS_DEAD:
         if (uuid_compare(info->uuid, swim->uuid) == 0) {
           char buf[40];
-          uuid_unparse(swim->uuid, buf);
-          fprintf(stderr, "Node %s was declared dead, exiting\n", buf);
+          uuid_unparse(info->uuid, buf);
+          fprintf(stderr, "Node %s declared dead, exiting\n", buf);
           exit(EXIT_FAILURE);
         }
+        break;
 
       case SWIM_STATUS_ALIVE:
       case SWIM_STATUS_SUSPECT:
@@ -57,33 +68,89 @@ static void swim_process_gossip(SWIM *swim, NodeInfo *gossip, int count) {
  *
  * We just respond that we are alive.
  */
-static void swim_process_ping(SWIM *swim, Event *event,
-                              __attribute__((__unused__)) struct sockaddr *addr,
-                              __attribute__((__unused__)) socklen_t addrlen) {
-  NodeInfo sender = {.status = SWIM_STATUS_ALIVE};
-
-  swim_send_ack(swim, addr, addrlen);
-
-  memcpy(&sender.addr, addr, addrlen);
-  uuid_copy(sender.uuid, event->hdr.uuid);
-  time(&sender.last_seen);
-  sender.addrlen = addrlen;
-
-  swim_state_add(swim, &sender);
+static void swim_process_ping(SWIM *swim, Event *event, struct sockaddr *addr,
+                              socklen_t addrlen) {
+  swim_send_ack(swim, swim->uuid, addr, addrlen);
   swim_process_gossip(swim, event->gossip, event->gossip_count);
 }
 
+/*
+ * Process the reception of a PING_REQ message.
+ *
+ * We pick the requested server and record the sending server as a
+ * witness. Any ack received from the pinged node will be sent back to
+ * that witness.
+ */
+static void swim_process_ping_req(SWIM *swim, Event *event,
+                                  struct sockaddr *addr, socklen_t addrlen) {
+  NodeState *node =
+      swim_state_suspect(swim, event->ping_req.ping_req_uuid, addr, addrlen);
+
+  if (node)
+    swim_send_ping(swim, (struct sockaddr *)&node->info.addr,
+                   node->info.addrlen);
+}
+
+/*
+ * Process the reception of an ACK message.
+ *
+ * If we are receiving an ACK to a PING_REQ, we need to send an ACK
+ * back to the PING_REQ sender, which is recorded as the witness.
+ */
 static void swim_process_ack(SWIM *swim, Event *event,
-                             __attribute__((__unused__)) struct sockaddr *addr,
-                             __attribute__((__unused__)) socklen_t addrlen) {
-  NodeInfo sender = {.status = SWIM_STATUS_ALIVE};
+                             __attribute__((unused)) struct sockaddr *addr,
+                             __attribute__((unused)) socklen_t addrlen) {
+  NodeState *node;
 
-  memcpy(&sender.addr, addr, addrlen);
-  uuid_copy(sender.uuid, event->hdr.uuid);
-  time(&sender.last_seen);
-  sender.addrlen = addrlen;
+  /*
+   * This is a strange situation, we shouldn't be able to get an ack
+   * for ourselves, but there is nothing to do for us here.
+   */
+  if (uuid_compare(event->ack.ack_uuid, swim->uuid) == 0) {
+    TRACE("Got ack for myself. Weird.");
+    return;
+  }
 
-  swim_state_add(swim, &sender);
+  node = swim_state_get_node(swim, event->ack.ack_uuid);
+  if (node == NULL) {
+    NodeInfo info;
+
+    /*
+     * If the node did not exist, we add it with the sender address
+     * and mark it as alive and seen. This is necessary since the ACK
+     * can be in response to a JOIN request, and in that case, it need
+     * to be added to the view.
+     */
+    swim_node_init(&info, event->ack.ack_uuid, addr, addrlen);
+    info.last_seen = event->hdr.time;
+
+    node = swim_state_add(swim, &info);
+  }
+
+  switch (node->info.status) {
+      /*
+       * If the sender node exists, is marked suspect, and there is a
+       * witness, then it needs to be notified that the node is alive.
+       */
+    case SWIM_STATUS_SUSPECT:
+      if (swim_node_has_witness(node)) {
+        swim_send_ack(swim, event->ack.ack_uuid,
+                      (struct sockaddr *)&node->witness.addr,
+                      node->witness.addrlen);
+        swim_node_reset_witness(node);
+      }
+      swim_cluster_refuted_dead(swim, node);
+      break;
+
+    case SWIM_STATUS_UNKNOWN:
+      swim_cluster_refuted_dead(swim, node);
+      break;
+
+    case SWIM_STATUS_DEAD:
+    case SWIM_STATUS_ALIVE:
+      break;
+  }
+
   swim_process_gossip(swim, event->gossip, event->gossip_count);
 }
 
@@ -103,10 +170,15 @@ static void swim_process_join(SWIM *swim, Event *event, struct sockaddr *addr,
   NodeInfo info;
 
   /*
-   * We skip adding the node if we have already added it. This is
-   * needed since we can receive a rumor that the node has joined as a
-   * result of the forwarding above
+   * We skip adding the node if we have already added it or if this is
+   * an attempt to join the node itself.
+   *
+   * This is needed since we can receive a rumor that the node has
+   * joined as a result of forwarding the join event.
    */
+  if (uuid_compare(swim->uuid, join->join_uuid) == 0)
+    return;
+
   if (swim_state_get_node(swim, join->join_uuid) != NULL)
     return;
 
@@ -131,7 +203,7 @@ static void swim_process_join(SWIM *swim, Event *event, struct sockaddr *addr,
                     swim->view[i].info.addrlen);
   }
 
-  swim_send_ack(swim, addr, addrlen);
+  swim_send_ack(swim, swim->uuid, addr, addrlen);
 }
 
 /*
@@ -149,7 +221,7 @@ static void swim_process_leave(SWIM *swim, Event *event, struct sockaddr *addr,
   struct LeaveEvent *leave = &event->leave;
 
   swim_state_del(swim, leave->leave_uuid);
-  swim_send_ack(swim, addr, addrlen);
+  swim_send_ack(swim, swim->uuid, addr, addrlen);
 }
 
 /*
@@ -166,6 +238,7 @@ typedef void process_callback_t(SWIM *swim, Event *event, struct sockaddr *addr,
  */
 static process_callback_t *swim_event_processing[] = {
     [EVENT_TYPE_PING] = swim_process_ping,
+    [EVENT_TYPE_PING_REQ] = swim_process_ping_req,
     [EVENT_TYPE_ACK] = swim_process_ack,
     [EVENT_TYPE_JOIN] = swim_process_join,
     [EVENT_TYPE_LEAVE] = swim_process_leave,
@@ -182,8 +255,11 @@ void swim_process_event(SWIM *swim, Event *event, size_t bytes,
       addr2str_r(addr, addrlen, buf, sizeof(buf)), bytes,
       swim_event_print(event));
 
-  /* We notice that we have seen the sending server as well, so that we do not
-   * need to ping it unnecessarily. */
-  swim_state_update_time(swim, event->hdr.uuid, event->hdr.time);
+  /*
+   * We need to notice the sender since the "public" address is there
+   * and we need to add the sender to the view if it is not already
+   * there.
+   */
+  swim_state_notice(swim, event->hdr.uuid, event->hdr.time);
   (*callback)(swim, event, addr, addrlen);
 }

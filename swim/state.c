@@ -1,5 +1,6 @@
 #include "state.h"
 
+#include <assert.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,8 +9,8 @@
 #include <sys/socket.h>
 
 #include "swim/debug.h"
-#include "swim/event.h"
 #include "swim/network.h"
+#include "swim/node.h"
 #include "swim/utils.h"
 
 static const char *status_name[] = {
@@ -40,7 +41,7 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
   char addrbuf[NI_MAXHOST + NI_MAXSERV + 1], uuid_buf[40];
   int err, fd;
   ssize_t res;
-  struct timeval timeout = {.tv_sec = 1, .tv_usec = 0};
+  struct timeval timeout = {.tv_sec = 10, .tv_usec = 0};
 
   fd = socket(AF_INET, SOCK_DGRAM, 0);
   if (fd < 0)
@@ -68,6 +69,7 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
   swim->addr = serveraddr;
   swim->sockfd = fd;
 
+  time(&swim->last_heartbeat);
   uuid_generate(swim->uuid);
 
   uuid_unparse(swim->uuid, uuid_buf);
@@ -78,10 +80,55 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
   return true;
 }
 
-void swim_state_update_time(SWIM *swim, uuid_t uuid, time_t time) {
+NodeState *swim_state_suspect(SWIM *swim, uuid_t uuid, struct sockaddr *addr,
+                              socklen_t addrlen) {
   NodeState *node = swim_state_get_node(swim, uuid);
-  if (node != NULL && node->info.last_seen <= time)
-    node->info.last_seen = time;
+
+  if (node) {
+    node->info.status = SWIM_STATUS_SUSPECT;
+
+    node->witness.addrlen = addrlen;
+    memcpy(&node->witness.addr, addr, addrlen);
+  }
+  return node;
+}
+
+/*
+ * Function: swim_state_notice
+ *
+ * Notice that node has sent a message and update status accordingly.
+ *
+ * If the instance is in the view and it is not marked dead, we mark
+ * it as seen and alive. In this case we assume that the address is
+ * already set so we will not change it.
+ *
+ * If there is no node, we ignore it. It can have been removed from
+ * the view for different reasons, but we are not tracking
+ * it for now.
+ *
+ * If the node exists and is dead, we just ignore it. Hence dead nodes
+ * will be cleaned up once they are old enough.
+ */
+void swim_state_notice(SWIM *swim, uuid_t uuid, time_t time) {
+  NodeState *node = swim_state_get_node(swim, uuid);
+
+  if (node) {
+    assert(node->info.last_seen > 0 &&
+           node->info.status != SWIM_STATUS_UNKNOWN);
+    switch (node->info.status) {
+      case SWIM_STATUS_UNKNOWN:
+      case SWIM_STATUS_SUSPECT:
+        node->info.status = SWIM_STATUS_ALIVE;
+        __attribute__((fallthrough));
+
+      case SWIM_STATUS_ALIVE:
+        node->info.last_seen = time;
+        break;
+
+      case SWIM_STATUS_DEAD:
+        break;
+    }
+  }
 }
 
 /*
@@ -112,6 +159,8 @@ void swim_state_merge(SWIM *swim, NodeInfo *info) {
 
       case SWIM_STATUS_DEAD:
       case SWIM_STATUS_UNKNOWN:
+        swim_node_reset(node);
+        break;
       default:
         break;
     }
@@ -119,10 +168,9 @@ void swim_state_merge(SWIM *swim, NodeInfo *info) {
 }
 
 /*
- * Add or update a node to the state view.
+ * Add a node to the state view.
  *
- * If the node is already in the view, we just update the timestamp
- * and mark it as alive.
+ * We do not change the status of the node if it already exists.
  *
  * Note:
  *
@@ -132,31 +180,26 @@ void swim_state_merge(SWIM *swim, NodeInfo *info) {
  *    We should probably ignore the gossip and require the node to
  *    generate a new UUID and re-join the cluster.
  */
-void swim_state_add(SWIM *swim, NodeInfo *info) {
-  NodeState *existing;
+NodeState *swim_state_add(SWIM *swim, NodeInfo *info) {
+  NodeState *node;
 
-  /* We ignore adding the node itself, if that is passed for some
-     reason */
-  if (uuid_compare(info->uuid, swim->uuid) == 0)
-    return;
+  /* Pre-conditions. */
+  assert(uuid_compare(info->uuid, swim->uuid) != 0);
+  assert(swim_state_get_node(swim, info->uuid) == NULL);
 
-  if ((existing = swim_state_get_node(swim, info->uuid))) {
-    memcpy(&existing->info.last_seen, &info->last_seen,
-           sizeof(existing->info.last_seen));
-    existing->info.status = SWIM_STATUS_ALIVE;
-  } else {
-    NodeState *node;
-
-    if (swim->view_size >= swim->view_capacity) {
-      swim->view = realloc(swim->view, 2 * swim->view_capacity);
-      swim->view_capacity *= 2;
-    }
-
-    node = &swim->view[swim->view_size++];
-    node->info = *info;
-
-    qsort(swim->view, swim->view_size, sizeof(NodeState), node_compare);
+  if (swim->view_size >= swim->view_capacity) {
+    swim->view = realloc(swim->view, 2 * swim->view_capacity);
+    swim->view_capacity *= 2;
   }
+
+  node = &swim->view[swim->view_size++];
+  node->info = *info;
+
+  qsort(swim->view, swim->view_size, sizeof(NodeState), node_compare);
+
+  assert(node != NULL); /* Post-condition */
+
+  return node;
 }
 
 /*
@@ -201,27 +244,37 @@ static const char *time_as_string(time_t time, char *buf, size_t bufsize) {
 }
 
 void swim_state_print(SWIM *swim) {
-  char uuid_buf[40], host[NI_MAXHOST], service[NI_MAXSERV];
+  char uuid_buf[40];
 
-  TRACE("view_size: %d, view_capacity: %d", swim->view_size,
-        swim->view_capacity);
-
-  fprintf(stderr, "%-40s %-26s %-10s %-20s %-10s\n", "UUID", "TIME", "STATUS",
-          "ADDRESS", "PORT");
+  uuid_unparse(swim->uuid, uuid_buf);
+  fprintf(stderr, "UUID: %s\n", uuid_buf);
+  fprintf(stderr, "%-40s %-26s %-10s %-20s %-20s\n", "UUID", "LAST_SEEN",
+          "STATUS", "ADDRESS", "WITNESS");
   for (int i = 0; i < swim->view_size; ++i) {
     NodeState *node = &swim->view[i];
 
     if (node) {
-      char buf[128];
-      int err =
-          getnameinfo((struct sockaddr *)&node->info.addr, node->info.addrlen,
-                      host, NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICSERV);
+      char buf[128], host[NI_MAXHOST], service[NI_MAXSERV];
+      int err;
 
       uuid_unparse(node->info.uuid, uuid_buf);
+
+      err = getnameinfo((struct sockaddr *)&node->info.addr, node->info.addrlen,
+                        host, NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICSERV);
+
       if (err == 0) {
-        fprintf(stderr, "%-40s %-26s %-10s %-20s %-10s\n", uuid_buf,
+        char addrbuf[NI_MAXHOST + NI_MAXSERV + 1] = {0};
+        char witbuf[NI_MAXHOST + NI_MAXSERV + 1] = {0};
+
+        swim_getaddr_r((struct sockaddr *)&node->info.addr, node->info.addrlen,
+                       addrbuf, sizeof(addrbuf));
+        if (node->witness.addrlen > 0)
+          swim_getaddr_r((struct sockaddr *)&node->witness.addr,
+                         node->witness.addrlen, witbuf, sizeof(witbuf));
+
+        fprintf(stderr, "%-40s %-26s %-10s %-20s %-20s\n", uuid_buf,
                 time_as_string(node->info.last_seen, buf, sizeof(buf)),
-                status_name[node->info.status], host, service);
+                status_name[node->info.status], addrbuf, witbuf);
       } else {
         fprintf(stderr, "%-40s %-20s %-10s\n", uuid_buf,
                 time_as_string(node->info.last_seen, buf, sizeof(buf)),
