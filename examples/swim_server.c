@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
 
 #include "swim/cluster.h"
@@ -33,7 +34,7 @@ static void server_loop(SWIM *swim);
  * Print usage and exit.
  */
 static void print_usage(const char *program_name) {
-  fprintf(stderr, "usage: %s [ -l PORT ] [ HOSTNAME [ PORT ] ]\n",
+  fprintf(stderr, "usage: %s [ -v ] [ -l PORT ] [ HOSTNAME [ PORT ] ]\n",
           program_name);
   exit(EXIT_FAILURE);
 }
@@ -45,10 +46,13 @@ static struct options parse_options(int argc, char *argv[]) {
   char *service = STR(SWIM_DEFAULT_PORTNO);
   char *hostname = NULL;
 
-  while ((opt = getopt(argc, argv, "vl:")) != -1) {
+  while ((opt = getopt(argc, argv, "dvl:")) != -1) {
     switch (opt) {
-      case 'v':
+      case 'd':
         tracing_on = true;
+        break;
+      case 'v':
+        verbose = true;
         break;
       case 'l':
         options.listen_port = atoi(optarg);

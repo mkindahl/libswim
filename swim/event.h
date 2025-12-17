@@ -77,5 +77,6 @@ extern void swim_event_init(Event* event, uuid_t uuid, EventType type,
                             size_t size);
 extern Event* swim_event_create(uuid_t uuid, EventType type,
                                 size_t gossip_count);
+extern const char* swim_event_print(Event* event);
 
 #endif /* SWIM_EVENT_H_ */

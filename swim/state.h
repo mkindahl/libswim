@@ -42,5 +42,6 @@ extern void swim_state_print(SWIM* swim);
 extern void swim_state_set_status(SWIM* swim, uuid_t uuid, Status status);
 extern void swim_state_update_time(SWIM* swim, uuid_t uuid, time_t time);
 extern void swim_state_merge(SWIM* swim, NodeInfo* info);
+extern const char* swim_status_name(Status status);
 
 #endif /* SWIM_STATE_H_ */

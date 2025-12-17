@@ -9,6 +9,17 @@
 #ifdef SWIM_TRACING
 
 extern bool tracing_on;
+extern bool verbose;
+
+#define LOG(MSG, ...)                                                \
+  do {                                                               \
+    if (verbose) {                                                   \
+      char timestr[200];                                             \
+      time_t now = time(NULL);                                       \
+      if (strftime(timestr, sizeof(timestr), "%c", localtime(&now))) \
+        fprintf(stderr, "%s " MSG "\n", timestr, ##__VA_ARGS__);     \
+    }                                                                \
+  } while (0)
 
 #define TRACE(MSG, ...)                                          \
   do {                                                           \

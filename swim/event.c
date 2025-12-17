@@ -2,10 +2,54 @@
 
 #include <assert.h>
 #include <memory.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "swim/defs.h"
+#include "swim/network.h"
+
+typedef int print_callback_t(Event* event, char* buf, size_t buflen);
+
+static int swim_print_ping(__attribute__((unused)) Event* event, char* buf,
+                           size_t buflen) {
+  return snprintf(buf, buflen, "PING");
+}
+
+static int swim_print_ack(__attribute__((unused)) Event* event, char* buf,
+                          size_t buflen) {
+  return snprintf(buf, buflen, "ACK");
+}
+
+static int swim_print_join(Event* event, char* buf, size_t buflen) {
+  char uuidbuf[40];
+  char addrbuf[NI_MAXHOST + NI_MAXSERV + 1];
+
+  uuid_unparse(event->join.join_uuid, uuidbuf);
+  if (event->join.join_addrlen > 0)
+    return snprintf(
+        buf, buflen, "JOIN(%s, %s)", uuidbuf,
+        swim_getaddr_r((struct sockaddr*)&event->join.join_addr,
+                       event->join.join_addrlen, addrbuf, sizeof(addrbuf)));
+  else
+    return snprintf(buf, buflen, "JOIN(%s)", uuidbuf);
+}
+
+static int swim_print_leave(Event* event, char* buf, size_t buflen) {
+  char uuidbuf[40];
+  uuid_unparse(event->leave.leave_uuid, uuidbuf);
+  return snprintf(buf, buflen, "LEAVE(%s)", uuidbuf);
+}
+
+/*
+ * Event dispatch structure with information about all events.
+ */
+static print_callback_t* swim_event[] = {
+    [EVENT_TYPE_PING] = swim_print_ping,
+    [EVENT_TYPE_ACK] = swim_print_ack,
+    [EVENT_TYPE_JOIN] = swim_print_join,
+    [EVENT_TYPE_LEAVE] = swim_print_leave,
+};
 
 bool swim_event_decode(Event* event, const char* buf, size_t buflen) {
   memcpy(event, buf, buflen);
@@ -54,4 +98,11 @@ void swim_event_init(Event* event, uuid_t uuid, EventType type, size_t size) {
   event->hdr.event_size = size;
   time(&event->hdr.time);
   uuid_copy(event->hdr.uuid, uuid);
+}
+
+const char* swim_event_print(Event* event) {
+  static char buf[128] = {0};
+  print_callback_t* print = swim_event[event->hdr.type];
+  (void)(*print)(event, buf, sizeof(buf));
+  return buf;
 }

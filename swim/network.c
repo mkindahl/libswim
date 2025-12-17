@@ -45,9 +45,15 @@ ssize_t swim_send_packet(SWIM *swim, void *buf, size_t buflen,
 /*
  * Helper function for sending an event.
  */
-
 ssize_t swim_send_event(SWIM *swim, Event *event, struct sockaddr *addr,
                         socklen_t addrlen) {
+  char buf[NI_MAXHOST + NI_MAXSERV + 1];
+  char uuidbuf[40];
+
+  uuid_unparse(event->hdr.uuid, uuidbuf);
+  LOG("node %s addr %s (%lu bytes): <- %s", uuidbuf,
+      addr2str_r(addr, addrlen, buf, sizeof(buf)), event->hdr.event_size,
+      swim_event_print(event));
   return sendto(swim->sockfd, event, event->hdr.event_size, 0, addr, addrlen);
 }
 
@@ -82,4 +88,16 @@ ssize_t swim_send_ping(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
   swim_fill_gossip(swim, event, gossip_count);
 
   return swim_send_event(swim, event, addr, addrlen);
+}
+
+const char *swim_getaddr_r(struct sockaddr *addr, socklen_t addrlen, char *buf,
+                           size_t buflen) {
+  char host[NI_MAXHOST], service[NI_MAXSERV];
+  if (getnameinfo(addr, addrlen, host, sizeof(host), service, sizeof(service),
+                  NI_NUMERICSERV) == 1)
+    return NULL;
+
+  snprintf(buf, buflen, "%s:%s", host, service);
+
+  return buf;
 }

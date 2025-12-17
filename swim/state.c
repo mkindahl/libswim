@@ -19,6 +19,10 @@ static const char *status_name[] = {
     [SWIM_STATUS_DEAD] = "DEAD",
 };
 
+const char *swim_status_name(Status status) {
+  return status_name[status];
+}
+
 /*
  * Compare two nodes or a key and an node.
  *

@@ -14,3 +14,5 @@ extern ssize_t swim_send_ack(SWIM *swim, struct sockaddr *addr,
                              socklen_t addrlen);
 extern ssize_t swim_send_ping(SWIM *swim, struct sockaddr *addr,
                               socklen_t addrlen);
+extern const char *swim_getaddr_r(struct sockaddr *addr, socklen_t addrlen,
+                                  char *buf, size_t buflen);
