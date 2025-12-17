@@ -9,7 +9,7 @@
 #include <sys/socket.h>
 
 #include "swim/defs.h"
-#include "swim/network.h"
+#include "swim/utils.h"
 
 typedef int print_callback_t(Event* event, char* buf, size_t buflen);
 
@@ -34,14 +34,12 @@ static int swim_print_ping_req(Event* event, char* buf, size_t buflen) {
 
 static int swim_print_join(Event* event, char* buf, size_t buflen) {
   char uuidbuf[40];
-  char addrbuf[NI_MAXHOST + NI_MAXSERV + 1];
 
   uuid_unparse(event->join.join_uuid, uuidbuf);
   if (event->join.join_addrlen > 0)
-    return snprintf(
-        buf, buflen, "JOIN(%s, %s)", uuidbuf,
-        swim_getaddr_r((struct sockaddr*)&event->join.join_addr,
-                       event->join.join_addrlen, addrbuf, sizeof(addrbuf)));
+    return snprintf(buf, buflen, "JOIN(%s, %s)", uuidbuf,
+                    swim_addr_str((struct sockaddr*)&event->join.join_addr,
+                                  event->join.join_addrlen));
   else
     return snprintf(buf, buflen, "JOIN(%s)", uuidbuf);
 }

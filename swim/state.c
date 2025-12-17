@@ -38,7 +38,7 @@ static int node_compare(const void *pkey, const void *pnode) {
 
 bool swim_state_init(SWIM *swim, uint16_t port) {
   struct sockaddr_in serveraddr;
-  char addrbuf[NI_MAXHOST + NI_MAXSERV + 1], uuid_buf[40];
+  char uuid_buf[40];
   int err, fd;
   ssize_t res;
   struct timeval timeout = {.tv_sec = 10, .tv_usec = 0};
@@ -74,8 +74,7 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
 
   uuid_unparse(swim->uuid, uuid_buf);
   TRACE("initialized server with UUID %s to listen on %s", uuid_buf,
-        addr2str_r((struct sockaddr *)&serveraddr, sizeof(serveraddr), addrbuf,
-                   sizeof(addrbuf)));
+        swim_addr_str((struct sockaddr *)&serveraddr, sizeof(serveraddr)));
 
   return true;
 }
@@ -119,7 +118,8 @@ void swim_state_notice(SWIM *swim, uuid_t uuid, time_t time) {
       case SWIM_STATUS_UNKNOWN:
       case SWIM_STATUS_SUSPECT:
         node->info.status = SWIM_STATUS_ALIVE;
-        __attribute__((fallthrough));
+        node->info.last_seen = time;
+        break;
 
       case SWIM_STATUS_ALIVE:
         node->info.last_seen = time;
@@ -213,18 +213,15 @@ NodeState *swim_state_add(SWIM *swim, NodeInfo *info) {
  * all nodes, this might lead to strange behaviour.
  */
 void swim_state_del(SWIM *swim, uuid_t uuid) {
-  /* We ignore deleting the node itself, if that is passed for some
-     reason */
+  NodeState *node;
+
+  /* We ignore deleting the node itself */
   if (uuid_compare(uuid, swim->uuid) == 0)
     return;
 
-  swim_state_set_status(swim, uuid, SWIM_STATUS_DEAD);
-}
-
-void swim_state_set_status(SWIM *swim, uuid_t uuid, Status status) {
-  NodeState *node = swim_state_get_node(swim, uuid);
+  node = swim_state_get_node(swim, uuid);
   if (node != NULL)
-    node->info.status = status;
+    node->info.status = SWIM_STATUS_DEAD;
 }
 
 NodeState *swim_state_get_node(SWIM *swim, uuid_t uuid) {
@@ -266,11 +263,10 @@ void swim_state_print(SWIM *swim) {
         char addrbuf[NI_MAXHOST + NI_MAXSERV + 1] = {0};
         char witbuf[NI_MAXHOST + NI_MAXSERV + 1] = {0};
 
-        swim_getaddr_r((struct sockaddr *)&node->info.addr, node->info.addrlen,
-                       addrbuf, sizeof(addrbuf));
+        swim_addr_str((struct sockaddr *)&node->info.addr, node->info.addrlen);
         if (node->witness.addrlen > 0)
-          swim_getaddr_r((struct sockaddr *)&node->witness.addr,
-                         node->witness.addrlen, witbuf, sizeof(witbuf));
+          swim_addr_str((struct sockaddr *)&node->witness.addr,
+                        node->witness.addrlen);
 
         fprintf(stderr, "%-40s %-26s %-10s %-20s %-20s\n", uuid_buf,
                 time_as_string(node->info.last_seen, buf, sizeof(buf)),

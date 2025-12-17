@@ -12,7 +12,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 
-add_compile_options(-Wall -Wextra)
+add_compile_options(-Wall -Wextra -Werror)
 
 # Include binary directory to access generated files, e.g., config.h
 include_directories(${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR})

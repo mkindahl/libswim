@@ -246,14 +246,12 @@ static process_callback_t *swim_event_processing[] = {
 
 void swim_process_event(SWIM *swim, Event *event, size_t bytes,
                         struct sockaddr *addr, socklen_t addrlen) {
-  char buf[NI_MAXHOST + NI_MAXSERV + 1];
   char uuidbuf[40];
   process_callback_t *callback = swim_event_processing[event->hdr.type];
 
   uuid_unparse(event->hdr.uuid, uuidbuf);
   LOG("node %s addr %s (%lu bytes) -> %s", uuidbuf,
-      addr2str_r(addr, addrlen, buf, sizeof(buf)), bytes,
-      swim_event_print(event));
+      swim_addr_str(addr, addrlen), bytes, swim_event_print(event));
 
   /*
    * We need to notice the sender since the "public" address is there
