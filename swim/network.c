@@ -51,7 +51,7 @@ ssize_t swim_send_event(SWIM *swim, Event *event, struct sockaddr *addr,
   char uuidbuf[40];
 
   uuid_unparse(event->hdr.uuid, uuidbuf);
-  LOG("node %s addr %s (%lu bytes): <- %s", uuidbuf,
+  LOG("node %s addr %s (%u bytes): <- %s", uuidbuf,
       addr2str_r(addr, addrlen, buf, sizeof(buf)), event->hdr.event_size,
       swim_event_print(event));
   return sendto(swim->sockfd, event, event->hdr.event_size, 0, addr, addrlen);

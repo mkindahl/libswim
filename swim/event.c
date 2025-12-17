@@ -96,8 +96,11 @@ Event* swim_event_create(uuid_t uuid, EventType type, size_t gossip_count) {
 }
 
 void swim_event_init(Event* event, uuid_t uuid, EventType type, size_t size) {
-  event->hdr.type = type;
+  assert(size < UINT32_MAX);
+  memset(event, 0, sizeof(Event));
+  event->hdr.version = 1;
   event->hdr.event_size = size;
+  event->hdr.type = type;
   time(&event->hdr.time);
   uuid_copy(event->hdr.uuid, uuid);
 }

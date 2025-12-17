@@ -2,6 +2,7 @@
 #define SWIM_EVENT_H_
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include <sys/socket.h>
 
@@ -19,15 +20,18 @@
 typedef enum EventType {
   EVENT_TYPE_PING,
   EVENT_TYPE_ACK,
-  EVENT_TYPE_JOIN,
+
+  /* Rumor events */
+  EVENT_TYPE_JOIN = 16,
   EVENT_TYPE_LEAVE,
 } EventType;
 
 typedef struct EventHeader {
-  size_t event_size;
-  EventType type;
-  uuid_t uuid;
-  time_t time;
+  uint8_t version;     /* Event format version */
+  uint32_t event_size; /* Size of the event */
+  EventType type;      /* Type of the event */
+  uuid_t uuid;         /* UUID of the event sender */
+  time_t time;         /* Time when the event was sent */
 } EventHeader;
 
 struct PingEvent {

@@ -24,7 +24,6 @@ void swim_cluster_join(SWIM* swim, struct sockaddr* addr, socklen_t addrlen) {
   swim_event_init(&event, swim->uuid, EVENT_TYPE_JOIN, sizeof(event));
 
   uuid_copy(event.join.join_uuid, swim->uuid);
-  event.join.join_addrlen = 0;
 
   swim_send_event(swim, &event, addr, addrlen);
 }
