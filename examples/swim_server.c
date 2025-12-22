@@ -105,18 +105,18 @@ int main(int argc, char *argv[]) {
 }
 
 static void server_loop(SWIM *swim) {
-  ssize_t bytes;
-  char buf[SWIM_MAXPACKET];
+  char buf[SWIM_MAX_PACKET_SIZE];
   struct sockaddr_storage addr_storage;
 
   while (true) {
+    ssize_t bytes;
     struct sockaddr *addr = (struct sockaddr *)&addr_storage;
     socklen_t addrlen = sizeof(addr_storage);
     Event *event = (Event *)buf;
 
-    bytes = swim_recv_packet(swim, buf, sizeof(buf), addr, addrlen);
+    bytes = swim_recv_event(swim, event, addr, &addrlen);
     if (bytes > 0)
-      swim_process_event(swim, event, bytes, addr, addrlen);
+      swim_process_event(swim, event, addr, addrlen);
 
     swim_cluster_heartbeat(swim);
 

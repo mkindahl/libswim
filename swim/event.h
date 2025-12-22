@@ -25,17 +25,16 @@ typedef enum EventType {
   /* Rumor events */
   EVENT_TYPE_JOIN = 16,
   EVENT_TYPE_LEAVE,
+  MAX_EVENT_TYPE
 } EventType;
 
 /*
  * Struct: EventHeader
  */
 typedef struct EventHeader {
-  uint8_t version;     /* Event format version */
-  uint32_t event_size; /* Size of the event */
-  EventType type;      /* Type of the event */
-  uuid_t uuid;         /* UUID of the event sender */
-  time_t time;         /* Time when the event was sent */
+  EventType type; /* Type of the event */
+  uuid_t uuid;    /* UUID of the event sender */
+  time_t time;    /* Time when the event was sent */
 } EventHeader;
 
 struct PingEvent {
@@ -101,10 +100,8 @@ typedef struct Event {
 } Event;
 
 extern bool swim_event_string(Event* event, char* buf, size_t);
-extern void swim_event_init(Event* event, uuid_t uuid, EventType type,
-                            size_t size);
-extern Event* swim_event_create(uuid_t uuid, EventType type,
-                                size_t gossip_count);
+extern void swim_event_init(Event* event, uuid_t uuid, EventType type);
+extern Event* swim_event_create(uuid_t uuid, EventType type, int gossip_count);
 extern const char* swim_event_print(Event* event);
 
 #endif /* SWIM_EVENT_H_ */

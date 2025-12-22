@@ -240,12 +240,12 @@ static process_callback_t *swim_event_processing[] = {
     [EVENT_TYPE_LEAVE] = swim_process_leave,
 };
 
-void swim_process_event(SWIM *swim, Event *event, size_t bytes,
-                        struct sockaddr *addr, socklen_t addrlen) {
+void swim_process_event(SWIM *swim, Event *event, struct sockaddr *addr,
+                        socklen_t addrlen) {
   process_callback_t *callback = swim_event_processing[event->hdr.type];
 
-  LOG("node %s addr %s (%lu bytes) -> %s", swim_uuid_str(event->hdr.uuid),
-      swim_addr_str(addr, addrlen), bytes, swim_event_print(event));
+  LOG("=== %s from node %s addr %s", swim_event_print(event),
+      swim_uuid_str(event->hdr.uuid), swim_addr_str(addr, addrlen));
 
   /*
    * We need to notice the sender since the "public" address is there

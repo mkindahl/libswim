@@ -9,6 +9,7 @@
 
 #include "swim/debug.h"
 #include "swim/defs.h"
+#include "swim/encoding.h"
 #include "swim/event.h"
 #include "swim/utils.h"
 
@@ -38,14 +39,24 @@ static void swim_fill_gossip(SWIM *swim, Event *event, int count) {
   }
 }
 
-ssize_t swim_recv_packet(SWIM *swim, void *buf, size_t buflen,
-                         struct sockaddr *addr, socklen_t addrlen) {
-  return recvfrom(swim->sockfd, buf, buflen, 0, addr, &addrlen);
-}
+/*
+ * Receive an event from the network.
+ */
+ssize_t swim_recv_event(SWIM *swim, Event *event, struct sockaddr *addr,
+                        socklen_t *addrlen) {
+  unsigned char buf[SWIM_MAX_PACKET_SIZE];
+  ssize_t bytes, result;
 
-ssize_t swim_send_packet(SWIM *swim, void *buf, size_t buflen,
-                         struct sockaddr *addr, socklen_t addrlen) {
-  return sendto(swim->sockfd, buf, buflen, 0, addr, addrlen);
+  bytes = recvfrom(swim->sockfd, buf, sizeof(buf), 0, addr, addrlen);
+  if (bytes <= 0)
+    return bytes;
+
+  result = swim_decode_event(buf, sizeof(buf), event);
+
+  LOG("<-- %s (%ld bytes) node %s addr %s", swim_event_print(event), bytes,
+      swim_uuid_str(event->hdr.uuid), swim_addr_str(addr, *addrlen));
+
+  return result;
 }
 
 /*
@@ -53,10 +64,13 @@ ssize_t swim_send_packet(SWIM *swim, void *buf, size_t buflen,
  */
 ssize_t swim_send_event(SWIM *swim, Event *event, struct sockaddr *addr,
                         socklen_t addrlen) {
-  LOG("node %s addr %s (%u bytes): <- %s", swim_uuid_str(event->hdr.uuid),
-      swim_addr_str(addr, addrlen), event->hdr.event_size,
-      swim_event_print(event));
-  return sendto(swim->sockfd, event, event->hdr.event_size, 0, addr, addrlen);
+  unsigned char buf[SWIM_MAX_PACKET_SIZE];
+  ssize_t bytes = swim_encode_event(buf, sizeof(buf), event);
+
+  LOG("--> %s (%ld bytes) node %s addr %s", swim_event_print(event), bytes,
+      swim_uuid_str(event->hdr.uuid), swim_addr_str(addr, addrlen));
+
+  return sendto(swim->sockfd, buf, bytes, 0, addr, addrlen);
 }
 
 /*
