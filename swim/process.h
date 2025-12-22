@@ -4,7 +4,7 @@
 #include "swim/event.h"
 #include "swim/state.h"
 
-extern void swim_process_event(SWIM *swim, Event *event, size_t bytes,
-                               struct sockaddr *addr, socklen_t addrlen);
+extern void swim_process_event(SWIM *swim, Event *event, struct sockaddr *addr,
+                               socklen_t addrlen);
 
 #endif /* SWIM_PROCESS_H_ */

@@ -82,25 +82,22 @@ bool swim_event_string(Event* event, char* buf, size_t buflen) {
   return true;
 }
 
-Event* swim_event_create(uuid_t uuid, EventType type, size_t gossip_count) {
+Event* swim_event_create(uuid_t uuid, EventType type, int gossip_count) {
   const size_t event_size = sizeof(Event) + gossip_count * sizeof(NodeInfo);
   Event* event = malloc(event_size);
 
-  assert(event_size < SWIM_MAXPACKET);
+  assert(event_size < SWIM_MAX_PACKET_SIZE);
 
   memset(event, 0, event_size);
 
-  swim_event_init(event, uuid, type, event_size);
+  swim_event_init(event, uuid, type);
   event->gossip_count = gossip_count;
 
   return event;
 }
 
-void swim_event_init(Event* event, uuid_t uuid, EventType type, size_t size) {
-  assert(size < UINT32_MAX);
+void swim_event_init(Event* event, uuid_t uuid, EventType type) {
   memset(event, 0, sizeof(Event));
-  event->hdr.version = 1;
-  event->hdr.event_size = size;
   event->hdr.type = type;
   time(&event->hdr.time);
   uuid_copy(event->hdr.uuid, uuid);

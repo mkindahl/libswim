@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <netinet/in.h>
 #include <sys/socket.h>
 
 #include "swim/debug.h"
@@ -186,6 +187,10 @@ NodeState *swim_state_add(SWIM *swim, NodeInfo *info) {
   assert(uuid_compare(info->uuid, swim->uuid) != 0);
   assert(swim_state_get_node(swim, info->uuid) == NULL);
 
+  TRACE("node %s addr %s addrlen %d", swim_uuid_str(info->uuid),
+        swim_addr_str((struct sockaddr *)&info->addr, info->addrlen),
+        info->addrlen);
+
   if (swim->view_size >= swim->view_capacity) {
     swim->view = realloc(swim->view, 2 * swim->view_capacity);
     swim->view_capacity *= 2;
@@ -241,31 +246,29 @@ static const char *time_as_string(time_t time, char *buf, size_t bufsize) {
 
 void swim_state_print(SWIM *swim) {
   fprintf(stderr, "UUID: %s\n", swim_uuid_str(swim->uuid));
-  fprintf(stderr, "%-40s %-26s %-10s %-20s %-20s\n", "UUID", "LAST_SEEN",
-          "STATUS", "ADDRESS", "WITNESS");
+  fprintf(stderr, "%-40s %-26s %-10s %-*s %-*s\n", "UUID", "LAST_SEEN",
+          "STATUS", INET_ADDRSTRLEN + 5, "ADDRESS", INET_ADDRSTRLEN + 5,
+          "WITNESS");
   for (int i = 0; i < swim->view_size; ++i) {
     NodeState *node = &swim->view[i];
 
     if (node) {
-      char buf[128], host[NI_MAXHOST], service[NI_MAXSERV];
-      int err;
+      char buf[128];
+      const char *address = swim_addr_str((struct sockaddr *)&node->info.addr,
+                                          node->info.addrlen);
 
-      err = getnameinfo((struct sockaddr *)&node->info.addr, node->info.addrlen,
-                        host, NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICSERV);
+      if (address) {
+        const char *witness = "";
 
-      if (err == 0) {
-        char addrbuf[NI_MAXHOST + NI_MAXSERV + 1] = {0};
-        char witbuf[NI_MAXHOST + NI_MAXSERV + 1] = {0};
-
-        swim_addr_str((struct sockaddr *)&node->info.addr, node->info.addrlen);
         if (node->witness.addrlen > 0)
-          swim_addr_str((struct sockaddr *)&node->witness.addr,
-                        node->witness.addrlen);
+          witness = swim_addr_str((struct sockaddr *)&node->witness.addr,
+                                  node->witness.addrlen);
 
-        fprintf(stderr, "%-40s %-26s %-10s %-20s %-20s\n",
+        fprintf(stderr, "%-40s %-26s %-10s %-*s %-*s\n",
                 swim_uuid_str(node->info.uuid),
                 time_as_string(node->info.last_seen, buf, sizeof(buf)),
-                status_name[node->info.status], addrbuf, witbuf);
+                status_name[node->info.status], INET_ADDRSTRLEN + 5, address,
+                INET_ADDRSTRLEN + 5, witness);
       } else {
         fprintf(stderr, "%-40s %-20s %-10s\n", swim_uuid_str(node->info.uuid),
                 time_as_string(node->info.last_seen, buf, sizeof(buf)),

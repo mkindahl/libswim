@@ -14,6 +14,8 @@ set(CMAKE_C_EXTENSIONS ON)
 
 add_compile_options(-Wall -Wextra -Werror)
 
+enable_testing()
+
 # Include binary directory to access generated files, e.g., config.h
 include_directories(${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
 add_subdirectory(swim)

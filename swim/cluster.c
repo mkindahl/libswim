@@ -20,7 +20,7 @@
 void swim_cluster_join(SWIM* swim, struct sockaddr* addr, socklen_t addrlen) {
   Event event;
 
-  swim_event_init(&event, swim->uuid, EVENT_TYPE_JOIN, sizeof(event));
+  swim_event_init(&event, swim->uuid, EVENT_TYPE_JOIN);
 
   uuid_copy(event.join.join_uuid, swim->uuid);
 
@@ -44,7 +44,7 @@ void swim_cluster_leave(SWIM* swim) {
   if (swim->view_size == 0)
     return;
 
-  swim_event_init(&event, swim->uuid, EVENT_TYPE_LEAVE, sizeof(event));
+  swim_event_init(&event, swim->uuid, EVENT_TYPE_LEAVE);
   for (int i = 0; i < MIN(swim->view_size, SWIM_MAXLEAVE); ++i) {
     NodeState* node = &swim->view[(pos + i) % swim->view_size];
     swim_send_event(swim, &event, (struct sockaddr*)&node->info.addr,
