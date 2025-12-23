@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
-project(libswim VERSION 0.1 LANGUAGES C)
+project(
+  libswim
+  VERSION 0.1
+  LANGUAGES C)
 
 # We use the "d" suffix for the debug version of the library"
 set(CMAKE_DEBUG_POSTFIX d)

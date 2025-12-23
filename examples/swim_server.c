@@ -12,23 +12,11 @@
 #include <sys/time.h>
 #include <sys/types.h>
 
-#include "swim/cluster.h"
-#include "swim/debug.h"
-#include "swim/defs.h"
-#include "swim/event.h"
 #include "swim/network.h"
-#include "swim/process.h"
+#include "swim/swim.h"
 
 #define STR(X) EXPAND(X)
 #define EXPAND(X) #X
-
-struct options {
-  int listen_port;
-  struct sockaddr_storage addr;
-  socklen_t addrlen;
-};
-
-static void server_loop(SWIM *swim);
 
 /*
  * Print usage and exit.
@@ -39,23 +27,23 @@ static void print_usage(const char *program_name) {
   exit(EXIT_FAILURE);
 }
 
-static struct options parse_options(int argc, char *argv[]) {
+static SwimAddress parse_options(int argc, char *argv[]) {
   int opt, err;
   struct addrinfo *result, hints;
-  struct options options = {.listen_port = SWIM_DEFAULT_PORTNO};
+  SwimAddress options = {.addrlen = 0};
   char *service = STR(SWIM_DEFAULT_PORTNO);
   char *hostname = NULL;
 
   while ((opt = getopt(argc, argv, "dvl:")) != -1) {
     switch (opt) {
       case 'd':
-        tracing_on = true;
+        swim_tracing_on = true;
         break;
       case 'v':
-        verbose = true;
+        swim_verbose = true;
         break;
       case 'l':
-        options.listen_port = atoi(optarg);
+        swim_listen_port = atoi(optarg);
         break;
       default:
         print_usage(argv[0]);
@@ -92,38 +80,9 @@ static struct options parse_options(int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
   SWIM swim;
-  struct options options;
+  SwimAddress address = parse_options(argc, argv);
 
-  options = parse_options(argc, argv);
-
-  swim_state_init(&swim, options.listen_port);
-
-  if (options.addrlen > 0)
-    swim_cluster_join(&swim, (struct sockaddr *)&options.addr, options.addrlen);
-
-  server_loop(&swim);
-}
-
-static void server_loop(SWIM *swim) {
-  char buf[SWIM_MAX_PACKET_SIZE];
-  struct sockaddr_storage addr_storage;
-  time_t last_printout = 0;
-
-  while (true) {
-    ssize_t bytes;
-    struct sockaddr *addr = (struct sockaddr *)&addr_storage;
-    socklen_t addrlen = sizeof(addr_storage);
-    Event *event = (Event *)buf;
-    time_t next_printout;
-
-    bytes = swim_recv_event(swim, event, addr, &addrlen);
-    if (bytes > 0)
-      swim_process_event(swim, event, addr, addrlen);
-
-    swim_cluster_heartbeat(swim);
-    if (last_printout + 5 > time(&next_printout)) {
-      swim_state_print(swim);
-      last_printout = next_printout;
-    }
-  }
+  swim_server_init(&swim, &address);
+  swim_server_start(&swim);
+  swim_server_wait(&swim);
 }

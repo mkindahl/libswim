@@ -1,4 +1,4 @@
 #include "debug.h"
 
-bool tracing_on = false;
-bool verbose = false;
+bool swim_tracing_on = false;
+bool swim_verbose = false;

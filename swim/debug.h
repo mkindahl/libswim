@@ -8,12 +8,12 @@
 
 #ifdef SWIM_TRACING
 
-extern bool tracing_on;
-extern bool verbose;
+extern bool swim_tracing_on;
+extern bool swim_verbose;
 
 #define LOG(MSG, ...)                                                \
   do {                                                               \
-    if (verbose) {                                                   \
+    if (swim_verbose) {                                              \
       char timestr[200];                                             \
       time_t now = time(NULL);                                       \
       if (strftime(timestr, sizeof(timestr), "%c", localtime(&now))) \
@@ -23,7 +23,7 @@ extern bool verbose;
 
 #define TRACE(MSG, ...)                                          \
   do {                                                           \
-    if (tracing_on)                                              \
+    if (swim_tracing_on)                                         \
       fprintf(stderr, "%s: " MSG "\n", __func__, ##__VA_ARGS__); \
   } while (0)
 

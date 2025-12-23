@@ -13,6 +13,9 @@
  *
  * The view does not include the node itself since that is unnecessary
  * to track.
+ *
+ * The server state is opaque and is dependent on the server
+ * implementation. See the corresponding server implementation file.
  */
 typedef struct SWIM {
   int sockfd;
@@ -22,6 +25,7 @@ typedef struct SWIM {
   int view_capacity;
   int view_size;
   NodeState* view;
+  void* server;
 } SWIM;
 
 extern NodeState* swim_state_add(SWIM* swim, NodeInfo* info);

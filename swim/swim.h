@@ -4,9 +4,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "swim/defs.h"
-#include "swim/state.h"
-
 #include <netinet/in.h>
+
+#include "swim/defs.h"
+#include "swim/server.h"
+#include "swim/state.h"
 
 #endif /* LIBSWIM_SWIM_H_ */
