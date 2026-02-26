@@ -21,9 +21,7 @@ void swim_cluster_join(SWIM* swim, struct sockaddr* addr, socklen_t addrlen) {
   Event event;
 
   swim_event_init(&event, swim->uuid, EVENT_TYPE_JOIN);
-
   uuid_copy(event.join.join_uuid, swim->uuid);
-
   swim_send_event(swim, &event, addr, addrlen);
 }
 
@@ -38,12 +36,12 @@ void swim_cluster_join(SWIM* swim, struct sockaddr* addr, socklen_t addrlen) {
  * remove it from the cluster.
  */
 void swim_cluster_leave(SWIM* swim) {
-  const int pos = rand() % swim->view_size;
-  Event event;
-
   if (swim->view_size == 0)
     return;
 
+  int pos = rand() % swim->view_size;
+
+  Event event;
   swim_event_init(&event, swim->uuid, EVENT_TYPE_LEAVE);
   for (int i = 0; i < MIN(swim->view_size, SWIM_MAXLEAVE); ++i) {
     NodeState* node = &swim->view[(pos + i) % swim->view_size];
@@ -126,11 +124,11 @@ void swim_cluster_heartbeat(SWIM* swim) {
  * SWIM_MAXPINGREQ ping requests to randomly selected nodes.
  */
 void swim_cluster_suspect_dead(SWIM* swim, NodeState* target) {
-  int start = rand() % swim->view_size;
-
   /* Should not be possible, since we have a node as parameter */
   if (swim->view_size == 0)
     return;
+
+  int start = rand() % swim->view_size;
 
   /*
    * We update the target node here since we already suspect it is
@@ -141,11 +139,10 @@ void swim_cluster_suspect_dead(SWIM* swim, NodeState* target) {
 
   for (int sent = MIN(swim->view_size, SWIM_MAXPINGREQ); sent > start; --sent) {
     NodeState* node = &swim->view[(start + sent) % swim->view_size];
-    if (node->info.status == SWIM_STATUS_ALIVE) {
+    if (node->info.status == SWIM_STATUS_ALIVE)
       swim_send_ping_req(swim, target->info.uuid,
                          (struct sockaddr*)&node->info.addr,
                          node->info.addrlen);
-    }
   }
 }
 
