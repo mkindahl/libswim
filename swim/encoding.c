@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "swim/defs.h"
 #include "swim/event.h"
@@ -254,11 +255,17 @@ ssize_t swim_encode_gossip(unsigned char* buf, size_t buflen, NodeInfo* gossip,
 }
 
 ssize_t swim_decode_gossip(unsigned char* buf, size_t buflen, NodeInfo* gossip,
-                           uint16_t* gossip_count) {
+                           uint16_t* gossip_count, uint16_t gossip_capacity) {
   unsigned char* ptr = buf;
   unsigned char* end = buf + buflen;
 
   ptr += swim_decode_uint16(ptr, end - ptr, gossip_count);
+
+  if (*gossip_count > gossip_capacity) {
+    fprintf(stderr, "gossip_count %u exceeds capacity %u, dropping message\n",
+            *gossip_count, gossip_capacity);
+    return -1;
+  }
 
   for (int i = 0; i < *gossip_count; ++i)
     ptr += swim_decode_info(ptr, end - ptr, &gossip[i]);
@@ -268,6 +275,8 @@ ssize_t swim_decode_gossip(unsigned char* buf, size_t buflen, NodeInfo* gossip,
 ssize_t swim_decode_event(unsigned char* buf, size_t buflen, Event* event) {
   unsigned char* ptr = buf;
   unsigned char* end = buf + buflen;
+  uint16_t gossip_capacity;
+  ssize_t gossip_bytes;
 
   ptr += swim_decode_event_header(ptr, end - ptr, &event->hdr);
 
@@ -296,8 +305,14 @@ ssize_t swim_decode_event(unsigned char* buf, size_t buflen, Event* event) {
       return -1;
   }
 
-  ptr +=
-      swim_decode_gossip(ptr, end - ptr, event->gossip, &event->gossip_count);
+  gossip_capacity =
+      (buflen - (ptr - buf) - sizeof(uint16_t)) / sizeof(NodeInfo);
+  gossip_bytes =
+      swim_decode_gossip(ptr, end - ptr, event->gossip, &event->gossip_count,
+                         gossip_capacity);
+  if (gossip_bytes < 0)
+    return -1;
+  ptr += gossip_bytes;
 
   return ptr - buf;
 }

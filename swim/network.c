@@ -52,6 +52,8 @@ ssize_t swim_recv_event(SWIM *swim, Event *event, struct sockaddr *addr,
     return bytes;
 
   result = swim_decode_event(buf, sizeof(buf), event);
+  if (result < 0)
+    return result;
 
   LOG("<-- %s (%ld bytes) node %s addr %s", swim_event_print(event), bytes,
       swim_uuid_str(event->hdr.uuid), swim_addr_str(addr, *addrlen));

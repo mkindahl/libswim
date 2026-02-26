@@ -97,6 +97,7 @@ extern ssize_t swim_decode_event_header(unsigned char* buf, size_t buflen,
 extern ssize_t swim_encode_gossip(unsigned char* buf, size_t buflen,
                                   NodeInfo* gossip, uint16_t gossip_count);
 extern ssize_t swim_decode_gossip(unsigned char* buf, size_t buflen,
-                                  NodeInfo* gossip, uint16_t* gossip_count);
+                                  NodeInfo* gossip, uint16_t* gossip_count,
+                                  uint16_t gossip_capacity);
 
 #endif /* SWIM_ENCODING_H_ */
