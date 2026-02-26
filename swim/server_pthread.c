@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,7 +18,7 @@
 
 struct PThreadServerState {
   pthread_t thread;
-  bool stopped;
+  atomic_bool stopped;
   SwimAddress address;
 };
 
