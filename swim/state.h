@@ -33,8 +33,8 @@ extern NodeState* swim_state_get_node(SWIM* swim, uuid_t uuid);
 extern NodeState* swim_state_suspect(SWIM* swim, uuid_t uuid,
                                      struct sockaddr* addr, socklen_t addrlen);
 extern bool swim_state_init(SWIM* swim, uint16_t port);
-extern void swim_state_del(SWIM* swim, uuid_t);
-extern void swim_state_notice(SWIM* swim, uuid_t uuid, time_t time);
+extern NodeState* swim_state_del(SWIM* swim, uuid_t);
+extern NodeState* swim_state_notice(SWIM* swim, uuid_t uuid, time_t time);
 extern void swim_state_print(SWIM* swim);
 extern void swim_state_set_status(SWIM* swim, uuid_t uuid, Status status);
 extern void swim_state_merge(SWIM* swim, NodeInfo* info);

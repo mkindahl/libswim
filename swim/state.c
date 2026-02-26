@@ -117,7 +117,7 @@ NodeState *swim_state_suspect(SWIM *swim, uuid_t uuid, struct sockaddr *addr,
  * If the node exists and is dead, we just ignore it. Hence dead nodes
  * will be cleaned up once they are old enough.
  */
-void swim_state_notice(SWIM *swim, uuid_t uuid, time_t time) {
+NodeState *swim_state_notice(SWIM *swim, uuid_t uuid, time_t time) {
   NodeState *node = swim_state_get_node(swim, uuid);
 
   if (node) {
@@ -138,6 +138,7 @@ void swim_state_notice(SWIM *swim, uuid_t uuid, time_t time) {
         break;
     }
   }
+  return node;
 }
 
 /*
@@ -238,16 +239,17 @@ NodeState *swim_state_add(SWIM *swim, NodeInfo *info) {
  * up from the view, but since it might not have been cleaned up from
  * all nodes, this might lead to strange behaviour.
  */
-void swim_state_del(SWIM *swim, uuid_t uuid) {
+NodeState *swim_state_del(SWIM *swim, uuid_t uuid) {
   NodeState *node;
 
   /* We ignore deleting the node itself */
   if (uuid_compare(uuid, swim->uuid) == 0)
-    return;
+    return NULL;
 
   node = swim_state_get_node(swim, uuid);
   if (node != NULL)
     node->info.status = SWIM_STATUS_DEAD;
+  return node;
 }
 
 NodeState *swim_state_get_node(SWIM *swim, uuid_t uuid) {
