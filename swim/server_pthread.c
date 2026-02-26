@@ -37,6 +37,8 @@ static void *pthread_server_loop(void *arg) {
 void swim_server_init(SWIM *swim,
                       __attribute__((unused)) const SwimAddress *address) {
   struct PThreadServerState *state = malloc(sizeof(struct PThreadServerState));
+  if (state == NULL)
+    return;
 
   memset(state, 0, sizeof(*state));
   state->address = *address;

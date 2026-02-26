@@ -84,9 +84,13 @@ bool swim_event_string(Event* event, char* buf, size_t buflen) {
 
 Event* swim_event_create(uuid_t uuid, EventType type, int gossip_count) {
   const size_t event_size = sizeof(Event) + gossip_count * sizeof(NodeInfo);
-  Event* event = malloc(event_size);
+  Event* event;
 
   assert(event_size < SWIM_MAX_PACKET_SIZE);
+
+  event = malloc(event_size);
+  if (event == NULL)
+    return NULL;
 
   memset(event, 0, event_size);
 

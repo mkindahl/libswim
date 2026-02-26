@@ -192,7 +192,14 @@ NodeState *swim_state_add(SWIM *swim, NodeInfo *info) {
         info->addrlen);
 
   if (swim->view_size >= swim->view_capacity) {
-    swim->view = realloc(swim->view, 2 * swim->view_capacity);
+    NodeState *new_view =
+        realloc(swim->view, 2 * swim->view_capacity * sizeof(NodeState));
+    if (new_view == NULL) {
+      fprintf(stderr, "failed to grow view from %d to %d\n",
+              swim->view_capacity, 2 * swim->view_capacity);
+      return NULL;
+    }
+    swim->view = new_view;
     swim->view_capacity *= 2;
   }
 
