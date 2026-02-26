@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <unistd.h>
+
 #include <netinet/in.h>
 #include <sys/socket.h>
 
@@ -48,10 +50,10 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
     return false;
 
   err = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-
   if (err < 0) {
     perror("setsockopt");
-    exit(EXIT_FAILURE);
+    close(fd);
+    return false;
   }
 
   memset(&serveraddr, 0, sizeof(serveraddr));
@@ -60,8 +62,10 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
   serveraddr.sin_port = htons(port);
 
   res = bind(fd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
-  if (res < 0)
+  if (res < 0) {
+    close(fd);
     return false;
+  }
 
   swim->view_capacity = 32; /* Cannot be zero, since it is doubled each time */
   swim->view_size = 0;
