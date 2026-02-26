@@ -275,9 +275,6 @@ ssize_t swim_decode_gossip(unsigned char* buf, size_t buflen, NodeInfo* gossip,
 ssize_t swim_decode_event(unsigned char* buf, size_t buflen, Event* event) {
   unsigned char* ptr = buf;
   unsigned char* end = buf + buflen;
-  uint16_t gossip_capacity;
-  ssize_t gossip_bytes;
-
   ptr += swim_decode_event_header(ptr, end - ptr, &event->hdr);
 
   switch (event->hdr.type) {
@@ -305,11 +302,10 @@ ssize_t swim_decode_event(unsigned char* buf, size_t buflen, Event* event) {
       return -1;
   }
 
-  gossip_capacity =
+  uint16_t gossip_capacity =
       (buflen - (ptr - buf) - sizeof(uint16_t)) / sizeof(NodeInfo);
-  gossip_bytes =
-      swim_decode_gossip(ptr, end - ptr, event->gossip, &event->gossip_count,
-                         gossip_capacity);
+  ssize_t gossip_bytes = swim_decode_gossip(
+      ptr, end - ptr, event->gossip, &event->gossip_count, gossip_capacity);
   if (gossip_bytes < 0)
     return -1;
   ptr += gossip_bytes;

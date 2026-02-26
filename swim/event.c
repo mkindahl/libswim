@@ -82,8 +82,16 @@ bool swim_event_string(Event* event, char* buf, size_t buflen) {
   return true;
 }
 
+/*
+ * Note: gossip_count is always bounded by SWIM_MAX_GOSSIP_SIZE at all
+ * call sites, so the size calculation below cannot overflow in practice.
+ * If new callers are added, they must ensure gossip_count is non-negative
+ * and small enough to avoid wrapping event_size.
+ */
 Event* swim_event_create(uuid_t uuid, EventType type, int gossip_count) {
   const size_t event_size = sizeof(Event) + gossip_count * sizeof(NodeInfo);
+
+  assert(gossip_count >= 0 && gossip_count <= SWIM_MAX_GOSSIP_SIZE);
   Event* event;
 
   assert(event_size < SWIM_MAX_PACKET_SIZE);
