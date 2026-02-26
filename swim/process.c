@@ -24,14 +24,16 @@
  * Process all gossip piggybacked on another event.
  */
 static void swim_process_gossip(SWIM *swim, NodeInfo *gossip, int count) {
-  TRACE("self uuid %s", swim_uuid_str(swim->uuid));
+  char ubuf[SWIM_UUID_STR_LEN];
+  TRACE("self uuid %s", swim_uuid_str_r(swim->uuid, ubuf, sizeof(ubuf)));
 
   for (int i = 0; i < count; ++i) {
     NodeInfo *info = &gossip[i];
 
     assert(info->last_seen > 0 && info->status != SWIM_STATUS_UNKNOWN);
 
-    TRACE("uuid %s status %s", swim_uuid_str(info->uuid),
+    TRACE("uuid %s status %s",
+          swim_uuid_str_r(info->uuid, ubuf, sizeof(ubuf)),
           swim_status_name(info->status));
 
     /*
@@ -44,7 +46,7 @@ static void swim_process_gossip(SWIM *swim, NodeInfo *gossip, int count) {
       case SWIM_STATUS_DEAD:
         if (uuid_compare(info->uuid, swim->uuid) == 0) {
           fprintf(stderr, "Node %s declared dead, exiting\n",
-                  swim_uuid_str(info->uuid));
+                  swim_uuid_str_r(info->uuid, ubuf, sizeof(ubuf)));
           exit(EXIT_FAILURE);
         }
         break;
@@ -244,8 +246,13 @@ void swim_process_event(SWIM *swim, Event *event, struct sockaddr *addr,
                         socklen_t addrlen) {
   process_callback_t *callback = swim_event_processing[event->hdr.type];
 
-  LOG("=== %s from node %s addr %s", swim_event_print(event),
-      swim_uuid_str(event->hdr.uuid), swim_addr_str(addr, addrlen));
+  {
+    char ubuf[SWIM_UUID_STR_LEN];
+    char abuf[NI_MAXHOST + NI_MAXSERV + 2];
+    LOG("=== %s from node %s addr %s", swim_event_print(event),
+        swim_uuid_str_r(event->hdr.uuid, ubuf, sizeof(ubuf)),
+        swim_addr_str_r(addr, addrlen, abuf, sizeof(abuf)));
+  }
 
   /*
    * We need to notice the sender since the "public" address is there

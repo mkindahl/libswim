@@ -19,13 +19,10 @@ const char *swim_addr_str_r(struct sockaddr *addr, socklen_t addrlen, char *buf,
   return buf;
 }
 
-const char *swim_addr_str(struct sockaddr *addr, socklen_t addrlen) {
-  static char buf[NI_MAXHOST + NI_MAXSERV + 2];
-  return swim_addr_str_r(addr, addrlen, buf, sizeof(buf));
-}
-
-extern const char *swim_uuid_str(uuid_t uuid) {
-  static char buf[40];
+const char *swim_uuid_str_r(uuid_t uuid, char *buf, size_t buflen) {
+  if (buflen < SWIM_UUID_STR_LEN)
+    return NULL;
   uuid_unparse(uuid, buf);
   return buf;
 }
+

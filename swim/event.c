@@ -19,28 +19,38 @@ static int swim_print_ping(__attribute__((unused)) Event* event, char* buf,
 }
 
 static int swim_print_ack(Event* event, char* buf, size_t buflen) {
-  return snprintf(buf, buflen, "ACK(%s)", swim_uuid_str(event->ack.ack_uuid));
+  char ubuf[SWIM_UUID_STR_LEN];
+  return snprintf(buf, buflen, "ACK(%s)",
+                  swim_uuid_str_r(event->ack.ack_uuid, ubuf, sizeof(ubuf)));
 }
 
 static int swim_print_ping_req(Event* event, char* buf, size_t buflen) {
+  char ubuf[SWIM_UUID_STR_LEN];
   return snprintf(buf, buflen, "PING_REQ(%s)",
-                  swim_uuid_str(event->ping_req.ping_req_uuid));
+                  swim_uuid_str_r(event->ping_req.ping_req_uuid, ubuf,
+                                  sizeof(ubuf)));
 }
 
 static int swim_print_join(Event* event, char* buf, size_t buflen) {
+  char ubuf[SWIM_UUID_STR_LEN];
+  char abuf[NI_MAXHOST + NI_MAXSERV + 2];
   if (event->join.join_addrlen > 0)
-    return snprintf(buf, buflen, "JOIN(%s, %s)",
-                    swim_uuid_str(event->join.join_uuid),
-                    swim_addr_str((struct sockaddr*)&event->join.join_addr,
-                                  event->join.join_addrlen));
+    return snprintf(
+        buf, buflen, "JOIN(%s, %s)",
+        swim_uuid_str_r(event->join.join_uuid, ubuf, sizeof(ubuf)),
+        swim_addr_str_r((struct sockaddr*)&event->join.join_addr,
+                        event->join.join_addrlen, abuf, sizeof(abuf)));
   else
-    return snprintf(buf, buflen, "JOIN(%s)",
-                    swim_uuid_str(event->join.join_uuid));
+    return snprintf(
+        buf, buflen, "JOIN(%s)",
+        swim_uuid_str_r(event->join.join_uuid, ubuf, sizeof(ubuf)));
 }
 
 static int swim_print_leave(Event* event, char* buf, size_t buflen) {
-  return snprintf(buf, buflen, "LEAVE(%s)",
-                  swim_uuid_str(event->leave.leave_uuid));
+  char ubuf[SWIM_UUID_STR_LEN];
+  return snprintf(
+      buf, buflen, "LEAVE(%s)",
+      swim_uuid_str_r(event->leave.leave_uuid, ubuf, sizeof(ubuf)));
 }
 
 /*

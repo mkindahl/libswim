@@ -76,9 +76,14 @@ bool swim_state_init(SWIM *swim, uint16_t port) {
   time(&swim->last_heartbeat);
   uuid_generate(swim->uuid);
 
-  TRACE("initialized server with UUID %s to listen on %s",
-        swim_uuid_str(swim->uuid),
-        swim_addr_str((struct sockaddr *)&serveraddr, sizeof(serveraddr)));
+  {
+    char ubuf[SWIM_UUID_STR_LEN];
+    char abuf[NI_MAXHOST + NI_MAXSERV + 2];
+    TRACE("initialized server with UUID %s to listen on %s",
+          swim_uuid_str_r(swim->uuid, ubuf, sizeof(ubuf)),
+          swim_addr_str_r((struct sockaddr *)&serveraddr, sizeof(serveraddr),
+                          abuf, sizeof(abuf)));
+  }
 
   return true;
 }
@@ -191,9 +196,15 @@ NodeState *swim_state_add(SWIM *swim, NodeInfo *info) {
   assert(uuid_compare(info->uuid, swim->uuid) != 0);
   assert(swim_state_get_node(swim, info->uuid) == NULL);
 
-  TRACE("node %s addr %s addrlen %d", swim_uuid_str(info->uuid),
-        swim_addr_str((struct sockaddr *)&info->addr, info->addrlen),
-        info->addrlen);
+  {
+    char ubuf[SWIM_UUID_STR_LEN];
+    char abuf[NI_MAXHOST + NI_MAXSERV + 2];
+    TRACE("node %s addr %s addrlen %d",
+          swim_uuid_str_r(info->uuid, ubuf, sizeof(ubuf)),
+          swim_addr_str_r((struct sockaddr *)&info->addr, info->addrlen, abuf,
+                          sizeof(abuf)),
+          info->addrlen);
+  }
 
   if (swim->view_size >= swim->view_capacity) {
     NodeState *new_view =
@@ -256,7 +267,9 @@ static const char *time_as_string(time_t time, char *buf, size_t bufsize) {
 }
 
 void swim_state_print(SWIM *swim) {
-  fprintf(stderr, "UUID: %s\n", swim_uuid_str(swim->uuid));
+  char ubuf[SWIM_UUID_STR_LEN];
+  fprintf(stderr, "UUID: %s\n",
+          swim_uuid_str_r(swim->uuid, ubuf, sizeof(ubuf)));
   fprintf(stderr, "%-40s %-26s %-10s %-*s %-*s\n", "UUID", "LAST_SEEN",
           "STATUS", INET_ADDRSTRLEN + 5, "ADDRESS", INET_ADDRSTRLEN + 5,
           "WITNESS");
@@ -265,23 +278,27 @@ void swim_state_print(SWIM *swim) {
 
     if (node) {
       char buf[128];
-      const char *address = swim_addr_str((struct sockaddr *)&node->info.addr,
-                                          node->info.addrlen);
+      char abuf[NI_MAXHOST + NI_MAXSERV + 2];
+      const char *address = swim_addr_str_r(
+          (struct sockaddr *)&node->info.addr, node->info.addrlen, abuf,
+          sizeof(abuf));
 
       if (address) {
+        char wbuf[NI_MAXHOST + NI_MAXSERV + 2];
         const char *witness = "";
 
         if (node->witness.addrlen > 0)
-          witness = swim_addr_str((struct sockaddr *)&node->witness.addr,
-                                  node->witness.addrlen);
+          witness = swim_addr_str_r((struct sockaddr *)&node->witness.addr,
+                                    node->witness.addrlen, wbuf, sizeof(wbuf));
 
         fprintf(stderr, "%-40s %-26s %-10s %-*s %-*s\n",
-                swim_uuid_str(node->info.uuid),
+                swim_uuid_str_r(node->info.uuid, ubuf, sizeof(ubuf)),
                 time_as_string(node->info.last_seen, buf, sizeof(buf)),
                 status_name[node->info.status], INET_ADDRSTRLEN + 5, address,
                 INET_ADDRSTRLEN + 5, witness);
       } else {
-        fprintf(stderr, "%-40s %-20s %-10s\n", swim_uuid_str(node->info.uuid),
+        fprintf(stderr, "%-40s %-20s %-10s\n",
+                swim_uuid_str_r(node->info.uuid, ubuf, sizeof(ubuf)),
                 time_as_string(node->info.last_seen, buf, sizeof(buf)),
                 status_name[node->info.status]);
       }
