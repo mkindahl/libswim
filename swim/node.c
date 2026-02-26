@@ -20,7 +20,7 @@ void swim_node_copy(NodeInfo* dst, NodeInfo* src) {
 
   uuid_copy(dst->uuid, src->uuid);
   memcpy(&dst->addr, &src->addr, src->addrlen);
-  memcpy(&dst->last_seen, &src->last_seen, sizeof(src->last_seen));
+  dst->last_seen = src->last_seen;
 }
 
 bool swim_node_has_witness(NodeState* node) {
