@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 
 #include "swim/defs.h"
+#include "swim/state.h"
 #include "swim/utils.h"
 
 typedef int print_callback_t(Event* event, char* buf, size_t buflen);
@@ -98,7 +99,7 @@ bool swim_event_string(Event* event, char* buf, size_t buflen) {
  * If new callers are added, they must ensure gossip_count is non-negative
  * and small enough to avoid wrapping event_size.
  */
-Event* swim_event_create(uuid_t uuid, EventType type, int gossip_count) {
+Event* swim_event_create(SWIM* swim, EventType type, int gossip_count) {
   const size_t event_size = sizeof(Event) + gossip_count * sizeof(NodeInfo);
 
   assert(gossip_count >= 0 && gossip_count <= SWIM_MAX_GOSSIP_SIZE);
@@ -112,17 +113,18 @@ Event* swim_event_create(uuid_t uuid, EventType type, int gossip_count) {
 
   memset(event, 0, event_size);
 
-  swim_event_init(event, uuid, type);
+  swim_event_init(event, swim, type);
   event->gossip_count = gossip_count;
 
   return event;
 }
 
-void swim_event_init(Event* event, uuid_t uuid, EventType type) {
+void swim_event_init(Event* event, SWIM* swim, EventType type) {
   memset(event, 0, sizeof(Event));
   event->hdr.type = type;
+  event->hdr.incarnation = swim->incarnation;
   time(&event->hdr.time);
-  uuid_copy(event->hdr.uuid, uuid);
+  uuid_copy(event->hdr.uuid, swim->uuid);
 }
 
 const char* swim_event_print(Event* event) {

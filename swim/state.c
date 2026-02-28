@@ -117,26 +117,35 @@ NodeState *swim_state_suspect(SWIM *swim, uuid_t uuid, struct sockaddr *addr,
  * If the node exists and is dead, we just ignore it. Hence dead nodes
  * will be cleaned up once they are old enough.
  */
-NodeState *swim_state_notice(SWIM *swim, uuid_t uuid, time_t time) {
+NodeState *swim_state_notice(SWIM *swim, uuid_t uuid, time_t time,
+                             uint32_t incarnation) {
   NodeState *node = swim_state_get_node(swim, uuid);
 
   if (node) {
     assert(node->info.last_seen > 0 &&
            node->info.status != SWIM_STATUS_UNKNOWN);
-    switch (node->info.status) {
-      case SWIM_STATUS_UNKNOWN:
-      case SWIM_STATUS_SUSPECT:
-        node->info.status = SWIM_STATUS_ALIVE;
-        node->info.last_seen = time;
-        break;
 
-      case SWIM_STATUS_ALIVE:
-        node->info.last_seen = time;
-        break;
+    if (incarnation > node->info.incarnation) {
+      node->info.incarnation = incarnation;
+      node->info.status = SWIM_STATUS_ALIVE;
+      node->info.last_seen = time;
+    } else if (incarnation == node->info.incarnation) {
+      switch (node->info.status) {
+        case SWIM_STATUS_UNKNOWN:
+        case SWIM_STATUS_SUSPECT:
+          node->info.status = SWIM_STATUS_ALIVE;
+          node->info.last_seen = time;
+          break;
 
-      case SWIM_STATUS_DEAD:
-        break;
+        case SWIM_STATUS_ALIVE:
+          node->info.last_seen = time;
+          break;
+
+        case SWIM_STATUS_DEAD:
+          break;
+      }
     }
+    /* incarnation < stored: stale, ignore */
   }
   return node;
 }
@@ -158,22 +167,36 @@ void swim_state_merge(SWIM *swim, NodeInfo *info) {
   if (node == NULL) {
     swim_state_add(swim, info);
   } else {
-    switch (node->info.status) {
-      case SWIM_STATUS_ALIVE:
-      case SWIM_STATUS_SUSPECT:
-        if (node->info.last_seen < info->last_seen) {
-          node->info.last_seen = info->last_seen;
-          node->info.status = SWIM_STATUS_ALIVE;
-        }
-        break;
+    if (info->incarnation > node->info.incarnation) {
+      /* Newer incarnation: accept unconditionally */
+      node->info.incarnation = info->incarnation;
+      node->info.last_seen = info->last_seen;
+      node->info.status = info->status;
+      swim_node_reset(node);
+    } else if (info->incarnation == node->info.incarnation) {
+      /* Same incarnation: status precedence (Alive < Suspect < Dead) */
+      switch (node->info.status) {
+        case SWIM_STATUS_ALIVE:
+        case SWIM_STATUS_SUSPECT:
+          if (info->status > node->info.status) {
+            node->info.status = info->status;
+            node->info.last_seen = info->last_seen;
+            swim_node_reset(node);
+          } else if (info->status == node->info.status &&
+                     node->info.last_seen < info->last_seen) {
+            node->info.last_seen = info->last_seen;
+          }
+          break;
 
-      case SWIM_STATUS_DEAD:
-      case SWIM_STATUS_UNKNOWN:
-        swim_node_reset(node);
-        break;
-      default:
-        break;
+        case SWIM_STATUS_DEAD:
+        case SWIM_STATUS_UNKNOWN:
+          swim_node_reset(node);
+          break;
+        default:
+          break;
+      }
     }
+    /* info->incarnation < stored: stale, ignore */
   }
 }
 

@@ -96,7 +96,7 @@ ssize_t swim_send_ack(SWIM *swim, uuid_t uuid, struct sockaddr *addr,
                       socklen_t addrlen) {
   const int gossip_count = MIN(swim->view_size, SWIM_MAX_GOSSIP_SIZE);
   Event *event __attribute__((cleanup(cleanup_free))) =
-      swim_event_create(swim->uuid, EVENT_TYPE_ACK, gossip_count);
+      swim_event_create(swim, EVENT_TYPE_ACK, gossip_count);
 
   uuid_copy(event->ack.ack_uuid, uuid);
 
@@ -119,7 +119,7 @@ ssize_t swim_send_ack(SWIM *swim, uuid_t uuid, struct sockaddr *addr,
 ssize_t swim_send_ping(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
   const int gossip_count = MIN(swim->view_size, SWIM_MAX_GOSSIP_SIZE);
   Event *event __attribute__((cleanup(cleanup_free))) =
-      swim_event_create(swim->uuid, EVENT_TYPE_PING, gossip_count);
+      swim_event_create(swim, EVENT_TYPE_PING, gossip_count);
 
   {
     char abuf[NI_MAXHOST + NI_MAXSERV + 2];
@@ -139,7 +139,7 @@ ssize_t swim_send_ping_req(SWIM *swim, uuid_t target_uuid,
                            struct sockaddr *addr, socklen_t addrlen) {
   const int gossip_count = MIN(swim->view_size, SWIM_MAX_GOSSIP_SIZE);
   Event *event __attribute__((cleanup(cleanup_free))) =
-      swim_event_create(swim->uuid, EVENT_TYPE_PING_REQ, gossip_count);
+      swim_event_create(swim, EVENT_TYPE_PING_REQ, gossip_count);
 
   uuid_copy(event->ping_req.ping_req_uuid, target_uuid);
 

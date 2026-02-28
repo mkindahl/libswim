@@ -42,19 +42,23 @@ static void swim_process_gossip(SWIM *swim, NodeInfo *gossip, int count) {
      *
      * TODO(mkindahl): Generate a new UUID and re-join the cluster.
      */
-    switch (info->status) {
-      case SWIM_STATUS_DEAD:
-        if (uuid_compare(info->uuid, swim->uuid) == 0) {
+    if (uuid_compare(info->uuid, swim->uuid) == 0) {
+      switch (info->status) {
+        case SWIM_STATUS_DEAD:
           fprintf(stderr, "Node %s declared dead, exiting\n",
                   swim_uuid_str_r(info->uuid, ubuf, sizeof(ubuf)));
           exit(EXIT_FAILURE);
-        }
-        break;
 
-      case SWIM_STATUS_ALIVE:
-      case SWIM_STATUS_SUSPECT:
-      case SWIM_STATUS_UNKNOWN:
-        break;
+        case SWIM_STATUS_SUSPECT:
+          TRACE("self suspected, incrementing incarnation to %u",
+                swim->incarnation + 1);
+          swim->incarnation++;
+          continue;
+
+        case SWIM_STATUS_ALIVE:
+        case SWIM_STATUS_UNKNOWN:
+          continue;
+      }
     }
 
     swim_state_merge(swim, info);
@@ -259,6 +263,7 @@ void swim_process_event(SWIM *swim, Event *event, struct sockaddr *addr,
    * and we need to add the sender to the view if it is not already
    * there.
    */
-  swim_state_notice(swim, event->hdr.uuid, event->hdr.time);
+  swim_state_notice(swim, event->hdr.uuid, event->hdr.time,
+                    event->hdr.incarnation);
   (*callback)(swim, event, addr, addrlen);
 }

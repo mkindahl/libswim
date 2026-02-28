@@ -17,10 +17,11 @@ void swim_node_init(NodeInfo* info, uuid_t uuid, struct sockaddr* addr,
 void swim_node_copy(NodeInfo* dst, NodeInfo* src) {
   dst->addrlen = src->addrlen;
   dst->status = src->status;
+  dst->incarnation = src->incarnation;
+  dst->last_seen = src->last_seen;
 
   uuid_copy(dst->uuid, src->uuid);
   memcpy(&dst->addr, &src->addr, src->addrlen);
-  dst->last_seen = src->last_seen;
 }
 
 bool swim_node_has_witness(NodeState* node) {
