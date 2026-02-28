@@ -20,6 +20,33 @@ embedded directly into an application, making it suitable for environments
 where running a separate daemon is impractical, such as IoT devices or
 resource-constrained systems.
 
+## Dependencies
+
+- CMake (>= 3.20)
+- Ninja (or another CMake-supported generator)
+- `libuuid`
+
+On Ubuntu:
+
+```sh
+sudo apt install cmake ninja-build uuid-dev
+```
+
+## Building
+
+To build:
+
+```sh
+cmake -B build -G Ninja
+cmake --build build
+```
+
+To run the tests:
+
+```sh
+ctest --test-dir build
+```
+
 [Consul]: https://www.consul.io/
 [Serf]: https://www.serf.io/
 [SWIM]: https://www.cs.cornell.edu/projects/Quicksilver/public_pdfs/SWIM.pdf
