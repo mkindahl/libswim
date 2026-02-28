@@ -28,3 +28,8 @@ add_executable(encoding_test encoding_test.c)
 target_link_libraries(encoding_test swim ${UUID_LIBRARY})
 
 add_test(NAME test_encoding COMMAND encoding_test)
+
+add_executable(state_test state_test.c)
+target_link_libraries(state_test swim ${UUID_LIBRARY})
+
+add_test(NAME test_state COMMAND state_test)
