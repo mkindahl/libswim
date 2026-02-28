@@ -2,6 +2,7 @@
 #define SWIM_NODE_H_
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -29,6 +30,7 @@ typedef enum Status {
 typedef struct NodeInfo {
   uuid_t uuid;
   time_t last_seen;
+  uint32_t incarnation;
   Status status;
   struct sockaddr_storage addr;
   socklen_t addrlen;

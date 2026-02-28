@@ -32,9 +32,10 @@ typedef enum EventType {
  * Struct: EventHeader
  */
 typedef struct EventHeader {
-  EventType type; /* Type of the event */
-  uuid_t uuid;    /* UUID of the event sender */
-  time_t time;    /* Time when the event was sent */
+  EventType type;          /* Type of the event */
+  uuid_t uuid;             /* UUID of the event sender */
+  time_t time;             /* Time when the event was sent */
+  uint32_t incarnation;    /* Incarnation number of the sender */
 } EventHeader;
 
 struct PingEvent {
@@ -99,9 +100,11 @@ typedef struct Event {
   NodeInfo gossip[];
 } Event;
 
+typedef struct SWIM SWIM;
+
 extern bool swim_event_string(Event* event, char* buf, size_t);
-extern void swim_event_init(Event* event, uuid_t uuid, EventType type);
-extern Event* swim_event_create(uuid_t uuid, EventType type, int gossip_count);
+extern void swim_event_init(Event* event, SWIM* swim, EventType type);
+extern Event* swim_event_create(SWIM* swim, EventType type, int gossip_count);
 extern const char* swim_event_print(Event* event);
 
 #endif /* SWIM_EVENT_H_ */

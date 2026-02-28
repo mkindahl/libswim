@@ -69,6 +69,7 @@ ssize_t swim_encode_event_header(unsigned char* buf, size_t buflen,
   ptr += swim_encode_uint32(ptr, end - ptr, 0);
   ptr += swim_encode_int64(ptr, end - ptr, header->time);
   ptr += swim_encode_uuid(ptr, end - ptr, header->uuid);
+  ptr += swim_encode_uint32(ptr, end - ptr, header->incarnation);
 
   *plen = ptr - buf;
 
@@ -89,6 +90,7 @@ ssize_t swim_decode_event_header(unsigned char* buf, size_t buflen,
   ptr += swim_decode_uint32(ptr, end - ptr, &event_size);
   ptr += swim_decode_int64(ptr, end - ptr, &header->time);
   ptr += swim_decode_uuid(ptr, end - ptr, header->uuid);
+  ptr += swim_decode_uint32(ptr, end - ptr, &header->incarnation);
 
   return ptr - buf;
 }
@@ -220,6 +222,7 @@ ssize_t swim_encode_info(unsigned char* buf, size_t buflen, NodeInfo* info) {
   ptr += swim_encode_fixlen(ptr, end - ptr, info->uuid, sizeof(uuid_t));
   ptr += swim_encode_int64(ptr, end - ptr, info->last_seen);
   ptr += swim_encode_uint16(ptr, end - ptr, info->status);
+  ptr += swim_encode_uint32(ptr, end - ptr, info->incarnation);
   ptr += swim_encode_sockaddr(ptr, end - ptr, (struct sockaddr*)&info->addr,
                               info->addrlen);
 
@@ -234,6 +237,7 @@ ssize_t swim_decode_info(unsigned char* buf, size_t buflen, NodeInfo* info) {
   ptr += swim_decode_fixlen(ptr, end - ptr, info->uuid, sizeof(uuid_t));
   ptr += swim_decode_int64(ptr, end - ptr, &info->last_seen);
   ptr += swim_decode_uint16(ptr, end - ptr, &status);
+  ptr += swim_decode_uint32(ptr, end - ptr, &info->incarnation);
   ptr += swim_decode_sockaddr(ptr, end - ptr, (struct sockaddr*)&info->addr,
                               &info->addrlen);
 

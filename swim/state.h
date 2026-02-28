@@ -22,6 +22,7 @@ typedef struct SWIM {
   time_t last_heartbeat;
   struct sockaddr_in addr;
   uuid_t uuid;
+  uint32_t incarnation;
   int view_capacity;
   int view_size;
   NodeState* view;
@@ -34,7 +35,8 @@ extern NodeState* swim_state_suspect(SWIM* swim, uuid_t uuid,
                                      struct sockaddr* addr, socklen_t addrlen);
 extern bool swim_state_init(SWIM* swim, uint16_t port);
 extern NodeState* swim_state_del(SWIM* swim, uuid_t);
-extern NodeState* swim_state_notice(SWIM* swim, uuid_t uuid, time_t time);
+extern NodeState* swim_state_notice(SWIM* swim, uuid_t uuid, time_t time,
+                                    uint32_t incarnation);
 extern void swim_state_print(SWIM* swim);
 extern void swim_state_set_status(SWIM* swim, uuid_t uuid, Status status);
 extern void swim_state_merge(SWIM* swim, NodeInfo* info);
