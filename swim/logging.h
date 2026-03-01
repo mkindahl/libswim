@@ -1,5 +1,5 @@
-#ifndef SWIM_DEBUG_H_
-#define SWIM_DEBUG_H_
+#ifndef SWIM_LOGGING_H_
+#define SWIM_LOGGING_H_
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -29,4 +29,4 @@ extern bool swim_verbose;
 
 #endif
 
-#endif /* SWIM_DEBUG_H_ */
+#endif /* SWIM_LOGGING_H_ */

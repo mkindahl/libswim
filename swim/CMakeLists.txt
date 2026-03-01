@@ -10,7 +10,7 @@ add_library(
   process.c
   cluster.c
   utils.c
-  debug.c
+  logging.c
   node.c
   encoding.c
   server.c)

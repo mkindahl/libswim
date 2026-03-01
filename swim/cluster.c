@@ -2,7 +2,7 @@
 
 #include <sys/param.h>
 
-#include "swim/debug.h"
+#include "swim/logging.h"
 #include "swim/defs.h"
 #include "swim/event.h"
 #include "swim/network.h"

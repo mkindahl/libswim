@@ -15,7 +15,7 @@
 #include <sys/time.h>
 
 #include "swim/cluster.h"
-#include "swim/debug.h"
+#include "swim/logging.h"
 #include "swim/event.h"
 #include "swim/network.h"
 #include "swim/utils.h"
