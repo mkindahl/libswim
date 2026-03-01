@@ -25,11 +25,12 @@ resource-constrained systems.
 - CMake (>= 3.20)
 - Ninja (or another CMake-supported generator)
 - `libuuid`
+- `ncurses` (optional — needed for the TUI example)
 
 On Ubuntu:
 
 ```sh
-sudo apt install cmake ninja-build uuid-dev
+sudo apt install cmake ninja-build uuid-dev libncurses-dev
 ```
 
 ## Building
