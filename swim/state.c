@@ -11,7 +11,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
-#include "swim/debug.h"
+#include "swim/logging.h"
 #include "swim/network.h"
 #include "swim/node.h"
 #include "swim/utils.h"
