@@ -37,7 +37,10 @@ extern bool swim_state_init(SWIM* swim, uint16_t port);
 extern NodeState* swim_state_del(SWIM* swim, uuid_t);
 extern NodeState* swim_state_notice(SWIM* swim, uuid_t uuid, time_t time,
                                     uint32_t incarnation);
+typedef void (*swim_state_print_fn)(SWIM* swim, void* userdata);
+
 extern void swim_state_print(SWIM* swim);
+extern void swim_state_set_print_callback(swim_state_print_fn cb, void* userdata);
 extern void swim_state_set_status(SWIM* swim, uuid_t uuid, Status status);
 extern void swim_state_merge(SWIM* swim, NodeInfo* info);
 extern const char* swim_status_name(Status status);
