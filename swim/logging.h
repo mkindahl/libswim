@@ -11,20 +11,25 @@
 extern bool swim_tracing_on;
 extern bool swim_verbose;
 
+typedef void (*swim_log_sink_fn)(const char *msg, void *userdata);
+
+extern void swim_set_log_sink(swim_log_sink_fn sink, void *userdata);
+extern void swim_log_write(const char *fmt, ...);
+
 #define LOG(MSG, ...)                                                \
   do {                                                               \
     if (swim_verbose) {                                              \
       char timestr[200];                                             \
       time_t now = time(NULL);                                       \
       if (strftime(timestr, sizeof(timestr), "%c", localtime(&now))) \
-        fprintf(stderr, "%s " MSG "\n", timestr, ##__VA_ARGS__);     \
+        swim_log_write("%s " MSG, timestr, ##__VA_ARGS__);           \
     }                                                                \
   } while (0)
 
-#define TRACE(MSG, ...)                                          \
-  do {                                                           \
-    if (swim_tracing_on)                                         \
-      fprintf(stderr, "%s: " MSG "\n", __func__, ##__VA_ARGS__); \
+#define TRACE(MSG, ...)                                      \
+  do {                                                       \
+    if (swim_tracing_on)                                     \
+      swim_log_write("%s: " MSG, __func__, ##__VA_ARGS__);   \
   } while (0)
 
 #endif

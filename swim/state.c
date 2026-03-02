@@ -280,6 +280,14 @@ NodeState *swim_state_get_node(SWIM *swim, uuid_t uuid) {
                  node_compare);
 }
 
+static swim_state_print_fn print_callback = NULL;
+static void *print_callback_userdata = NULL;
+
+void swim_state_set_print_callback(swim_state_print_fn cb, void *userdata) {
+  print_callback = cb;
+  print_callback_userdata = userdata;
+}
+
 static const char *time_as_string(time_t time, char *buf, size_t bufsize) {
   struct tm t;
 
@@ -292,6 +300,11 @@ static const char *time_as_string(time_t time, char *buf, size_t bufsize) {
 }
 
 void swim_state_print(SWIM *swim) {
+  if (print_callback) {
+    print_callback(swim, print_callback_userdata);
+    return;
+  }
+
   char ubuf[SWIM_UUID_STR_LEN];
   fprintf(stderr, "UUID: %s\n",
           swim_uuid_str_r(swim->uuid, ubuf, sizeof(ubuf)));
