@@ -3,8 +3,11 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-bool swim_tracing_on = false;
 bool swim_verbose = false;
+
+#ifdef SWIM_TRACING
+bool swim_tracing_on = false;
+#endif
 
 static swim_log_sink_fn log_sink = NULL;
 static void *log_sink_userdata = NULL;

@@ -9,6 +9,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tracing: [ON, OFF]
     steps:
       - uses: actions/checkout@v4
 
@@ -16,7 +19,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ninja-build uuid-dev libcmocka-dev
 
       - name: Configure
-        run: cmake -B build -G Ninja
+        run: cmake -B build -G Ninja -DSWIM_TRACING=${{ matrix.tracing }}
 
       - name: Build
         run: cmake --build build
