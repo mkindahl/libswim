@@ -2,9 +2,9 @@
 
 #include <sys/param.h>
 
-#include "swim/logging.h"
 #include "swim/defs.h"
 #include "swim/event.h"
+#include "swim/logging.h"
 #include "swim/network.h"
 
 /*
@@ -17,7 +17,7 @@
  * We mark the address of ourselves as unknown since this will be
  * figured out by the receiving node.
  */
-void swim_cluster_join(SWIM* swim, struct sockaddr* addr, socklen_t addrlen) {
+void swim_cluster_join(SWIM *swim, struct sockaddr *addr, socklen_t addrlen) {
   Event event;
 
   swim_event_init(&event, swim, EVENT_TYPE_JOIN);
@@ -35,7 +35,7 @@ void swim_cluster_join(SWIM* swim, struct sockaddr* addr, socklen_t addrlen) {
  * notice that the node does not respond any more and eventually
  * remove it from the cluster.
  */
-void swim_cluster_leave(SWIM* swim) {
+void swim_cluster_leave(SWIM *swim) {
   if (swim->view_size == 0)
     return;
 
@@ -44,9 +44,9 @@ void swim_cluster_leave(SWIM* swim) {
   Event event;
   swim_event_init(&event, swim, EVENT_TYPE_LEAVE);
   for (int i = 0; i < MIN(swim->view_size, SWIM_MAXLEAVE); ++i) {
-    NodeState* node = &swim->view[(pos + i) % swim->view_size];
-    swim_send_event(swim, &event, (struct sockaddr*)&node->info.addr,
-                    node->info.addrlen);
+    NodeState *node = &swim->view[(pos + i) % swim->view_size];
+    swim_send_event(
+        swim, &event, (struct sockaddr *)&node->info.addr, node->info.addrlen);
   }
 }
 
@@ -57,7 +57,7 @@ void swim_cluster_leave(SWIM* swim) {
  * heartbeat event (this is just a PING event) to other nodes but also
  * update the status of all nodes in the view.
  */
-void swim_cluster_heartbeat(SWIM* swim) {
+void swim_cluster_heartbeat(SWIM *swim) {
   time_t now;
 
   time(&now);
@@ -69,12 +69,15 @@ void swim_cluster_heartbeat(SWIM* swim) {
    */
   if (swim->view_size > 0 &&
       swim->last_heartbeat + SWIM_HEARTBEAT_INTERVAL < now) {
-    NodeState* target = &swim->view[rand() % swim->view_size];
+    int target_idx = swim_probe_next(swim);
 
     swim->last_heartbeat = now;
 
-    swim_send_ping(swim, (struct sockaddr*)&target->info.addr,
-                   target->info.addrlen);
+    if (target_idx >= 0) {
+      NodeState *target = &swim->view[target_idx];
+      swim_send_ping(
+          swim, (struct sockaddr *)&target->info.addr, target->info.addrlen);
+    }
 
     /*
      * Update the state of all nodes in the view. We only do this if
@@ -83,12 +86,13 @@ void swim_cluster_heartbeat(SWIM* swim) {
      * period.
      */
     for (int i = 0; i < swim->view_size; ++i) {
-      NodeState* candidate = &swim->view[i];
+      NodeState *candidate = &swim->view[i];
       switch (candidate->info.status) {
         case SWIM_STATUS_ALIVE:
           if (candidate->info.last_seen <= now - 60) {
             TRACE("node was last seen %ld, which is before %ld",
-                  candidate->info.last_seen, now - 60);
+                  candidate->info.last_seen,
+                  now - 60);
             swim_cluster_suspect_dead(swim, candidate);
           }
           break;
@@ -96,7 +100,8 @@ void swim_cluster_heartbeat(SWIM* swim) {
         case SWIM_STATUS_SUSPECT:
           if (candidate->info.last_seen <= now - 120) {
             TRACE("witness time %ld, which is before %ld",
-                  candidate->info.last_seen, now - 120);
+                  candidate->info.last_seen,
+                  now - 120);
             swim_cluster_declare_dead(swim, candidate);
           }
           break;
@@ -106,8 +111,8 @@ void swim_cluster_heartbeat(SWIM* swim) {
           break;
 
         default:
-          fprintf(stderr, "unknown status of node: %d\n",
-                  candidate->info.status);
+          fprintf(
+              stderr, "unknown status of node: %d\n", candidate->info.status);
           break;
       }
     }
@@ -123,7 +128,7 @@ void swim_cluster_heartbeat(SWIM* swim) {
  * we will send out either one ping request to each node, or at most
  * SWIM_MAXPINGREQ ping requests to randomly selected nodes.
  */
-void swim_cluster_suspect_dead(SWIM* swim, NodeState* target) {
+void swim_cluster_suspect_dead(SWIM *swim, NodeState *target) {
   /* Should not be possible, since we have a node as parameter */
   if (swim->view_size == 0)
     return;
@@ -138,10 +143,11 @@ void swim_cluster_suspect_dead(SWIM* swim, NodeState* target) {
   target->info.status = SWIM_STATUS_SUSPECT;
 
   for (int sent = MIN(swim->view_size, SWIM_MAXPINGREQ); sent > start; --sent) {
-    NodeState* node = &swim->view[(start + sent) % swim->view_size];
+    NodeState *node = &swim->view[(start + sent) % swim->view_size];
     if (node->info.status == SWIM_STATUS_ALIVE)
-      swim_send_ping_req(swim, target->info.uuid,
-                         (struct sockaddr*)&node->info.addr,
+      swim_send_ping_req(swim,
+                         target->info.uuid,
+                         (struct sockaddr *)&node->info.addr,
                          node->info.addrlen);
   }
 }
@@ -156,8 +162,8 @@ void swim_cluster_suspect_dead(SWIM* swim, NodeState* target) {
  * Note that a node declared dead can never refute it. The node need
  * to create a new UUID and join the cluster again.
  */
-void swim_cluster_declare_dead(__attribute__((unused)) SWIM* swim,
-                               NodeState* target) {
+void swim_cluster_declare_dead(__attribute__((unused)) SWIM *swim,
+                               NodeState *target) {
   target->info.status = SWIM_STATUS_DEAD;
 }
 
@@ -167,8 +173,8 @@ void swim_cluster_declare_dead(__attribute__((unused)) SWIM* swim,
  * This means setting the status to alive and removing any witness
  * that says otherwise.
  */
-void swim_cluster_refuted_dead(__attribute__((unused)) SWIM* swim,
-                               NodeState* node) {
+void swim_cluster_refuted_dead(__attribute__((unused)) SWIM *swim,
+                               NodeState *node) {
   node->info.status = SWIM_STATUS_ALIVE;
   swim_node_reset_witness(node);
 }
