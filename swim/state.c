@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <unistd.h>
 
 #include <netinet/in.h>
@@ -40,50 +39,47 @@ static int node_compare(const void *pkey, const void *pnode) {
 }
 
 bool swim_state_init(SWIM *swim, uint16_t port) {
-  struct sockaddr_in serveraddr;
-  int err, fd;
-  ssize_t res;
-  struct timeval timeout = {.tv_sec = 10, .tv_usec = 0};
+  memset(swim, 0, sizeof(SWIM));
 
-  fd = socket(AF_INET, SOCK_DGRAM, 0);
+  int fd = socket(AF_INET, SOCK_DGRAM, 0);
   if (fd < 0)
     return false;
 
-  err = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+  struct timeval timeout = {.tv_sec = 10, .tv_usec = 0};
+  int err = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
   if (err < 0) {
     perror("setsockopt");
     close(fd);
     return false;
   }
 
-  memset(&serveraddr, 0, sizeof(serveraddr));
-  serveraddr.sin_family = AF_INET;
-  serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
-  serveraddr.sin_port = htons(port);
+  swim->addr.sin_family = AF_INET;
+  swim->addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  swim->addr.sin_port = htons(port);
 
-  res = bind(fd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+  ssize_t res = bind(fd, (struct sockaddr *)&swim->addr, sizeof(swim->addr));
   if (res < 0) {
     close(fd);
     return false;
   }
 
   swim->view_capacity = 32; /* Cannot be zero, since it is doubled each time */
-  swim->view_size = 0;
   swim->view = calloc(swim->view_capacity, sizeof(NodeState));
-  swim->addr = serveraddr;
   swim->sockfd = fd;
 
   time(&swim->last_heartbeat);
   uuid_generate(swim->uuid);
 
-  {
-    char ubuf[SWIM_UUID_STR_LEN];
-    char abuf[NI_MAXHOST + NI_MAXSERV + 2];
-    TRACE("initialized server with UUID %s to listen on %s",
-          swim_uuid_str_r(swim->uuid, ubuf, sizeof(ubuf)),
-          swim_addr_str_r((struct sockaddr *)&serveraddr, sizeof(serveraddr),
-                          abuf, sizeof(abuf)));
-  }
+#ifdef SWIM_TRACING
+  char ubuf[SWIM_UUID_STR_LEN];
+  char abuf[NI_MAXHOST + NI_MAXSERV + 2];
+  TRACE("initialized server with UUID %s to listen on %s",
+        swim_uuid_str_r(swim->uuid, ubuf, sizeof(ubuf)),
+        swim_addr_str_r((struct sockaddr *)&swim->addr,
+                        sizeof(swim->addr),
+                        abuf,
+                        sizeof(abuf)));
+#endif
 
   return true;
 }
@@ -157,12 +153,10 @@ NodeState *swim_state_notice(SWIM *swim, uuid_t uuid, time_t time,
  */
 
 void swim_state_merge(SWIM *swim, NodeInfo *info) {
-  NodeState *node;
-
   if (uuid_compare(info->uuid, swim->uuid) == 0)
     return;
 
-  node = swim_state_get_node(swim, info->uuid);
+  NodeState *node = swim_state_get_node(swim, info->uuid);
 
   if (node == NULL) {
     swim_state_add(swim, info);
@@ -214,38 +208,39 @@ void swim_state_merge(SWIM *swim, NodeInfo *info) {
  *    generate a new UUID and re-join the cluster.
  */
 NodeState *swim_state_add(SWIM *swim, NodeInfo *info) {
-  NodeState *node;
-
   /* Pre-conditions. */
   assert(uuid_compare(info->uuid, swim->uuid) != 0);
   assert(swim_state_get_node(swim, info->uuid) == NULL);
 
-  {
-    char ubuf[SWIM_UUID_STR_LEN];
-    char abuf[NI_MAXHOST + NI_MAXSERV + 2];
-    TRACE("node %s addr %s addrlen %d",
-          swim_uuid_str_r(info->uuid, ubuf, sizeof(ubuf)),
-          swim_addr_str_r((struct sockaddr *)&info->addr, info->addrlen, abuf,
-                          sizeof(abuf)),
-          info->addrlen);
-  }
+#ifdef SWIM_TRACING
+  char ubuf[SWIM_UUID_STR_LEN];
+  char abuf[NI_MAXHOST + NI_MAXSERV + 2];
+  TRACE("node %s addr %s addrlen %d",
+        swim_uuid_str_r(info->uuid, ubuf, sizeof(ubuf)),
+        swim_addr_str_r(
+            (struct sockaddr *)&info->addr, info->addrlen, abuf, sizeof(abuf)),
+        info->addrlen);
+#endif
 
   if (swim->view_size >= swim->view_capacity) {
     NodeState *new_view =
         realloc(swim->view, 2 * swim->view_capacity * sizeof(NodeState));
     if (new_view == NULL) {
-      fprintf(stderr, "failed to grow view from %d to %d\n",
-              swim->view_capacity, 2 * swim->view_capacity);
+      fprintf(stderr,
+              "failed to grow view from %d to %d\n",
+              swim->view_capacity,
+              2 * swim->view_capacity);
       return NULL;
     }
     swim->view = new_view;
     swim->view_capacity *= 2;
   }
 
-  node = &swim->view[swim->view_size++];
+  NodeState *node = &swim->view[swim->view_size++];
   node->info = *info;
 
   qsort(swim->view, swim->view_size, sizeof(NodeState), node_compare);
+  swim_probe_invalidate(swim);
 
   assert(node != NULL); /* Post-condition */
 
@@ -263,21 +258,21 @@ NodeState *swim_state_add(SWIM *swim, NodeInfo *info) {
  * all nodes, this might lead to strange behaviour.
  */
 NodeState *swim_state_del(SWIM *swim, uuid_t uuid) {
-  NodeState *node;
-
   /* We ignore deleting the node itself */
   if (uuid_compare(uuid, swim->uuid) == 0)
     return NULL;
 
-  node = swim_state_get_node(swim, uuid);
-  if (node != NULL)
+  NodeState *node = swim_state_get_node(swim, uuid);
+  if (node != NULL) {
     node->info.status = SWIM_STATUS_DEAD;
+    swim_probe_invalidate(swim);
+  }
   return node;
 }
 
 NodeState *swim_state_get_node(SWIM *swim, uuid_t uuid) {
-  return bsearch(uuid, swim->view, swim->view_size, sizeof(NodeState),
-                 node_compare);
+  return bsearch(
+      uuid, swim->view, swim->view_size, sizeof(NodeState), node_compare);
 }
 
 static swim_state_print_fn print_callback = NULL;
@@ -306,10 +301,16 @@ void swim_state_print(SWIM *swim) {
   }
 
   char ubuf[SWIM_UUID_STR_LEN];
-  fprintf(stderr, "UUID: %s\n",
-          swim_uuid_str_r(swim->uuid, ubuf, sizeof(ubuf)));
-  fprintf(stderr, "%-40s %-26s %-10s %-*s %-*s\n", "UUID", "LAST_SEEN",
-          "STATUS", INET_ADDRSTRLEN + 5, "ADDRESS", INET_ADDRSTRLEN + 5,
+  fprintf(
+      stderr, "UUID: %s\n", swim_uuid_str_r(swim->uuid, ubuf, sizeof(ubuf)));
+  fprintf(stderr,
+          "%-40s %-26s %-10s %-*s %-*s\n",
+          "UUID",
+          "LAST_SEEN",
+          "STATUS",
+          INET_ADDRSTRLEN + 5,
+          "ADDRESS",
+          INET_ADDRSTRLEN + 5,
           "WITNESS");
   for (int i = 0; i < swim->view_size; ++i) {
     NodeState *node = &swim->view[i];
@@ -317,9 +318,10 @@ void swim_state_print(SWIM *swim) {
     if (node) {
       char buf[128];
       char abuf[NI_MAXHOST + NI_MAXSERV + 2];
-      const char *address = swim_addr_str_r(
-          (struct sockaddr *)&node->info.addr, node->info.addrlen, abuf,
-          sizeof(abuf));
+      const char *address = swim_addr_str_r((struct sockaddr *)&node->info.addr,
+                                            node->info.addrlen,
+                                            abuf,
+                                            sizeof(abuf));
 
       if (address) {
         char wbuf[NI_MAXHOST + NI_MAXSERV + 2];
@@ -327,19 +329,91 @@ void swim_state_print(SWIM *swim) {
 
         if (node->witness.addrlen > 0)
           witness = swim_addr_str_r((struct sockaddr *)&node->witness.addr,
-                                    node->witness.addrlen, wbuf, sizeof(wbuf));
+                                    node->witness.addrlen,
+                                    wbuf,
+                                    sizeof(wbuf));
 
-        fprintf(stderr, "%-40s %-26s %-10s %-*s %-*s\n",
+        fprintf(stderr,
+                "%-40s %-26s %-10s %-*s %-*s\n",
                 swim_uuid_str_r(node->info.uuid, ubuf, sizeof(ubuf)),
                 time_as_string(node->info.last_seen, buf, sizeof(buf)),
-                status_name[node->info.status], INET_ADDRSTRLEN + 5, address,
-                INET_ADDRSTRLEN + 5, witness);
+                status_name[node->info.status],
+                INET_ADDRSTRLEN + 5,
+                address,
+                INET_ADDRSTRLEN + 5,
+                witness);
       } else {
-        fprintf(stderr, "%-40s %-20s %-10s\n",
+        fprintf(stderr,
+                "%-40s %-20s %-10s\n",
                 swim_uuid_str_r(node->info.uuid, ubuf, sizeof(ubuf)),
                 time_as_string(node->info.last_seen, buf, sizeof(buf)),
                 status_name[node->info.status]);
       }
     }
   }
+}
+
+/*
+ * Shuffle the probe schedule using Fisher-Yates.
+ *
+ * Fills the order array with indices 0..view_size-1 and shuffles
+ * them. Resets the position to the start of the new round.
+ */
+void swim_probe_shuffle(SWIM *swim) {
+  int n = swim->view_size;
+
+  if (n == 0) {
+    swim->probe.size = 0;
+    swim->probe.pos = 0;
+    return;
+  }
+
+  int *order = realloc(swim->probe.order, n * sizeof(int));
+  if (order == NULL)
+    return;
+
+  for (int i = 0; i < n; i++)
+    order[i] = i;
+
+  for (int i = n - 1; i > 0; i--) {
+    int j = rand() % (i + 1);
+    int tmp = order[i];
+    order[i] = order[j];
+    order[j] = tmp;
+  }
+
+  swim->probe.order = order;
+  swim->probe.size = n;
+  swim->probe.pos = 0;
+}
+
+/*
+ * Return the next probe target index, or -1 if no probeable node exists.
+ *
+ * Reshuffles automatically when the current round is exhausted or the
+ * view has changed. Skips dead nodes.
+ */
+int swim_probe_next(SWIM *swim) {
+  if (swim->view_size == 0)
+    return -1;
+
+  if (swim->probe.pos >= swim->probe.size ||
+      swim->probe.size != swim->view_size)
+    swim_probe_shuffle(swim);
+
+  while (swim->probe.pos < swim->probe.size) {
+    int idx = swim->probe.order[swim->probe.pos++];
+    if (idx < swim->view_size &&
+        swim->view[idx].info.status != SWIM_STATUS_DEAD)
+      return idx;
+  }
+
+  return -1;
+}
+
+/*
+ * Invalidate the probe schedule, forcing a reshuffle on next probe.
+ */
+void swim_probe_invalidate(SWIM *swim) {
+  swim->probe.size = 0;
 }

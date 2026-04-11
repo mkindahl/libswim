@@ -1,0 +1,32 @@
+BasedOnStyle: Google
+PointerAlignment: Right
+DerivePointerAlignment: false
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Inline
+BinPackParameters: true
+BinPackArguments: false
+IncludeBlocks: Regroup
+IncludeCategories:
+  # C++ standard include files
+  - Regex: "<[a-z_0-9]+>"
+    Priority: 4
+    SortPriority: 4
+
+  # C standard include files
+  - Regex: '<[a-z_0-9]+\.h>'
+    Priority: 4
+    SortPriority: 4
+
+  # System include files
+  - Regex: '<(arpa|sys|netinet)/[a-z0-9_]+\.h>'
+    Priority: 5
+    SortPriority: 5
+  - Regex: '<.*\.h>'
+    Priority: 10
+    SortPriority: 10
+
+  # These are assumed to be project include files
+  - Regex: '".*"'
+    Priority: 7
+    SortPriority: 7

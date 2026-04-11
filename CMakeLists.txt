@@ -16,6 +16,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 
 add_compile_options(-Wall -Wextra -Werror)
+add_definitions(-D_GNU_SOURCE)
 
 enable_testing()
 
