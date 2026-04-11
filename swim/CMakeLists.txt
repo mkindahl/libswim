@@ -29,7 +29,13 @@ target_link_libraries(encoding_test swim ${UUID_LIBRARY})
 
 add_test(NAME test_encoding COMMAND encoding_test)
 
-add_executable(state_test state_test.c)
-target_link_libraries(state_test swim ${UUID_LIBRARY})
+if(cmocka_FOUND)
+  add_executable(state_test state_test.c)
+  target_link_libraries(state_test swim ${UUID_LIBRARY} cmocka::cmocka)
+  add_test(NAME test_state COMMAND state_test)
 
-add_test(NAME test_state COMMAND state_test)
+  add_executable(probe_test probe_test.c)
+  target_link_libraries(probe_test swim ${UUID_LIBRARY} cmocka::cmocka)
+  target_link_options(probe_test PRIVATE "LINKER:--wrap=rand")
+  add_test(NAME test_probe COMMAND probe_test)
+endif()

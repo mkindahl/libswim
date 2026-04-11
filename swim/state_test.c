@@ -1,18 +1,37 @@
-#include "state.h"
-#include "test.h"
+// clang-format off
+#include <stdarg.h>
+#include <stddef.h>
+#include <setjmp.h>
+#include <cmocka.h>
+// clang-format on
+
+#include <stdlib.h>
 
 #include "swim/node.h"
+#include "swim/state.h"
 
-static void swim_test_init(SWIM *swim) {
-  memset(swim, 0, sizeof(*swim));
+static int setup(void **state) {
+  SWIM *swim = calloc(1, sizeof(SWIM));
+  assert_non_null(swim);
   swim->sockfd = -1;
   swim->view_capacity = 16;
   swim->view = calloc(swim->view_capacity, sizeof(NodeState));
+  swim->probe.order = NULL;
+  swim->probe.pos = 0;
+  swim->probe.size = 0;
   uuid_generate(swim->uuid);
   time(&swim->last_heartbeat);
+  *state = swim;
+  return 0;
 }
 
-static void swim_test_cleanup(SWIM *swim) { free(swim->view); }
+static int teardown(void **state) {
+  SWIM *swim = *state;
+  free(swim->probe.order);
+  free(swim->view);
+  free(swim);
+  return 0;
+}
 
 static void make_node(NodeInfo *info, uuid_t uuid, Status status,
                       uint32_t incarnation, time_t last_seen) {
@@ -29,9 +48,8 @@ static void make_node(NodeInfo *info, uuid_t uuid, Status status,
 
 /* --- swim_state_add tests --- */
 
-static void test_add_new_node(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_add_new_node(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
@@ -39,95 +57,80 @@ static void test_add_new_node(void) {
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_ALIVE, 1, 1000);
 
-  NodeState *added = swim_state_add(&swim, &info);
-  EXPECT_NOT_NULL(added);
-  EXPECT_EQ_INT(swim.view_size, 1, "d");
+  NodeState *added = swim_state_add(swim, &info);
+  assert_non_null(added);
+  assert_int_equal(swim->view_size, 1);
 
-  NodeState *found = swim_state_get_node(&swim, id);
-  EXPECT_NOT_NULL(found);
-  EXPECT_EQ_INT(found->info.status, SWIM_STATUS_ALIVE, "d");
-  EXPECT_EQ_INT(found->info.incarnation, 1, "u");
-  EXPECT_EQ_INT((int)found->info.last_seen, 1000, "d");
-
-  swim_test_cleanup(&swim);
+  NodeState *found = swim_state_get_node(swim, id);
+  assert_non_null(found);
+  assert_int_equal(found->info.status, SWIM_STATUS_ALIVE);
+  assert_int_equal(found->info.incarnation, 1);
+  assert_int_equal((int)found->info.last_seen, 1000);
 }
 
-static void test_add_multiple_sorted(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_add_multiple_sorted(void **state) {
+  SWIM *swim = *state;
 
   uuid_t ids[3];
   for (int i = 0; i < 3; i++) {
     uuid_generate(ids[i]);
     NodeInfo info;
     make_node(&info, ids[i], SWIM_STATUS_ALIVE, 1, 1000 + i);
-    swim_state_add(&swim, &info);
+    swim_state_add(swim, &info);
   }
 
-  EXPECT_EQ_INT(swim.view_size, 3, "d");
+  assert_int_equal(swim->view_size, 3);
 
   for (int i = 0; i < 3; i++) {
-    NodeState *found = swim_state_get_node(&swim, ids[i]);
-    EXPECT_NOT_NULL(found);
+    NodeState *found = swim_state_get_node(swim, ids[i]);
+    assert_non_null(found);
   }
-
-  swim_test_cleanup(&swim);
 }
 
 /* --- swim_state_del tests --- */
 
-static void test_del_marks_dead(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_del_marks_dead(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_ALIVE, 1, 1000);
-  swim_state_add(&swim, &info);
+  swim_state_add(swim, &info);
 
-  NodeState *deleted = swim_state_del(&swim, id);
-  EXPECT_NOT_NULL(deleted);
-  EXPECT_EQ_INT(deleted->info.status, SWIM_STATUS_DEAD, "d");
-
-  swim_test_cleanup(&swim);
+  NodeState *deleted = swim_state_del(swim, id);
+  assert_non_null(deleted);
+  assert_int_equal(deleted->info.status, SWIM_STATUS_DEAD);
 }
 
-static void test_del_self_ignored(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_del_self_ignored(void **state) {
+  SWIM *swim = *state;
 
-  NodeState *result = swim_state_del(&swim, swim.uuid);
-  EXPECT_NULL(result);
-  EXPECT_EQ_INT(swim.view_size, 0, "d");
-
-  swim_test_cleanup(&swim);
+  NodeState *result = swim_state_del(swim, swim->uuid);
+  assert_null(result);
+  assert_int_equal(swim->view_size, 0);
 }
 
-static void test_del_missing_returns_null(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_del_missing_returns_null(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
 
-  NodeState *result = swim_state_del(&swim, id);
-  EXPECT_NULL(result);
-
-  swim_test_cleanup(&swim);
+  NodeState *result = swim_state_del(swim, id);
+  assert_null(result);
 }
 
 /* --- swim_state_suspect tests --- */
 
-static void test_suspect_sets_status(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_suspect_sets_status(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_ALIVE, 1, 1000);
-  swim_state_add(&swim, &info);
+  swim_state_add(swim, &info);
 
   struct sockaddr_in witness_addr = {
       .sin_family = AF_INET,
@@ -136,22 +139,19 @@ static void test_suspect_sets_status(void) {
   };
 
   NodeState *result = swim_state_suspect(
-      &swim, id, (struct sockaddr *)&witness_addr, sizeof(witness_addr));
-  EXPECT_NOT_NULL(result);
-  EXPECT_EQ_INT(result->info.status, SWIM_STATUS_SUSPECT, "d");
-
-  swim_test_cleanup(&swim);
+      swim, id, (struct sockaddr *)&witness_addr, sizeof(witness_addr));
+  assert_non_null(result);
+  assert_int_equal(result->info.status, SWIM_STATUS_SUSPECT);
 }
 
-static void test_suspect_records_witness(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_suspect_records_witness(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_ALIVE, 1, 1000);
-  swim_state_add(&swim, &info);
+  swim_state_add(swim, &info);
 
   struct sockaddr_in witness_addr = {
       .sin_family = AF_INET,
@@ -160,317 +160,294 @@ static void test_suspect_records_witness(void) {
   };
 
   NodeState *result = swim_state_suspect(
-      &swim, id, (struct sockaddr *)&witness_addr, sizeof(witness_addr));
-  EXPECT_TRUE(swim_node_has_witness(result));
-
-  swim_test_cleanup(&swim);
+      swim, id, (struct sockaddr *)&witness_addr, sizeof(witness_addr));
+  assert_true(swim_node_has_witness(result));
 }
 
 /* --- swim_state_notice tests --- */
 
-static void test_notice_alive_updates_time(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_notice_alive_updates_time(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_ALIVE, 1, 1000);
-  swim_state_add(&swim, &info);
+  swim_state_add(swim, &info);
 
-  NodeState *result = swim_state_notice(&swim, id, 2000, 1);
-  EXPECT_NOT_NULL(result);
-  EXPECT_EQ_INT((int)result->info.last_seen, 2000, "d");
-  EXPECT_EQ_INT(result->info.status, SWIM_STATUS_ALIVE, "d");
-
-  swim_test_cleanup(&swim);
+  NodeState *result = swim_state_notice(swim, id, 2000, 1);
+  assert_non_null(result);
+  assert_int_equal((int)result->info.last_seen, 2000);
+  assert_int_equal(result->info.status, SWIM_STATUS_ALIVE);
 }
 
-static void test_notice_suspect_to_alive(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_notice_suspect_to_alive(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_SUSPECT, 1, 1000);
-  swim_state_add(&swim, &info);
+  swim_state_add(swim, &info);
 
-  NodeState *result = swim_state_notice(&swim, id, 2000, 1);
-  EXPECT_NOT_NULL(result);
-  EXPECT_EQ_INT(result->info.status, SWIM_STATUS_ALIVE, "d");
-
-  swim_test_cleanup(&swim);
+  NodeState *result = swim_state_notice(swim, id, 2000, 1);
+  assert_non_null(result);
+  assert_int_equal(result->info.status, SWIM_STATUS_ALIVE);
 }
 
-static void test_notice_dead_ignored(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_notice_dead_ignored(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_DEAD, 1, 1000);
-  swim_state_add(&swim, &info);
+  swim_state_add(swim, &info);
 
-  NodeState *result = swim_state_notice(&swim, id, 2000, 1);
-  EXPECT_NOT_NULL(result);
-  EXPECT_EQ_INT(result->info.status, SWIM_STATUS_DEAD, "d");
-  EXPECT_EQ_INT((int)result->info.last_seen, 1000, "d");
-
-  swim_test_cleanup(&swim);
+  NodeState *result = swim_state_notice(swim, id, 2000, 1);
+  assert_non_null(result);
+  assert_int_equal(result->info.status, SWIM_STATUS_DEAD);
+  assert_int_equal((int)result->info.last_seen, 1000);
 }
 
-static void test_notice_higher_incarnation(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_notice_higher_incarnation(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_SUSPECT, 1, 1000);
-  swim_state_add(&swim, &info);
+  swim_state_add(swim, &info);
 
-  NodeState *result = swim_state_notice(&swim, id, 2000, 5);
-  EXPECT_NOT_NULL(result);
-  EXPECT_EQ_INT(result->info.status, SWIM_STATUS_ALIVE, "d");
-  EXPECT_EQ_INT(result->info.incarnation, 5, "u");
-  EXPECT_EQ_INT((int)result->info.last_seen, 2000, "d");
-
-  swim_test_cleanup(&swim);
+  NodeState *result = swim_state_notice(swim, id, 2000, 5);
+  assert_non_null(result);
+  assert_int_equal(result->info.status, SWIM_STATUS_ALIVE);
+  assert_int_equal(result->info.incarnation, 5);
+  assert_int_equal((int)result->info.last_seen, 2000);
 }
 
-static void test_notice_stale_incarnation_ignored(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_notice_stale_incarnation_ignored(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_ALIVE, 5, 1000);
-  swim_state_add(&swim, &info);
+  swim_state_add(swim, &info);
 
-  NodeState *result = swim_state_notice(&swim, id, 2000, 3);
-  EXPECT_NOT_NULL(result);
-  EXPECT_EQ_INT(result->info.incarnation, 5, "u");
-  EXPECT_EQ_INT((int)result->info.last_seen, 1000, "d");
-  EXPECT_EQ_INT(result->info.status, SWIM_STATUS_ALIVE, "d");
-
-  swim_test_cleanup(&swim);
+  NodeState *result = swim_state_notice(swim, id, 2000, 3);
+  assert_non_null(result);
+  assert_int_equal(result->info.incarnation, 5);
+  assert_int_equal((int)result->info.last_seen, 1000);
+  assert_int_equal(result->info.status, SWIM_STATUS_ALIVE);
 }
 
-static void test_notice_missing_returns_null(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_notice_missing_returns_null(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
 
-  NodeState *result = swim_state_notice(&swim, id, 2000, 1);
-  EXPECT_NULL(result);
-
-  swim_test_cleanup(&swim);
+  NodeState *result = swim_state_notice(swim, id, 2000, 1);
+  assert_null(result);
 }
 
 /* --- swim_state_merge tests --- */
 
-static void test_merge_new_node_added(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_merge_new_node_added(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_ALIVE, 1, 1000);
 
-  swim_state_merge(&swim, &info);
+  swim_state_merge(swim, &info);
 
-  EXPECT_EQ_INT(swim.view_size, 1, "d");
-  NodeState *found = swim_state_get_node(&swim, id);
-  EXPECT_NOT_NULL(found);
-  EXPECT_EQ_INT(found->info.status, SWIM_STATUS_ALIVE, "d");
-
-  swim_test_cleanup(&swim);
+  assert_int_equal(swim->view_size, 1);
+  NodeState *found = swim_state_get_node(swim, id);
+  assert_non_null(found);
+  assert_int_equal(found->info.status, SWIM_STATUS_ALIVE);
 }
 
-static void test_merge_higher_incarnation_updates(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_merge_higher_incarnation_updates(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_ALIVE, 1, 1000);
-  swim_state_add(&swim, &info);
+  swim_state_add(swim, &info);
 
   NodeInfo gossip;
   make_node(&gossip, id, SWIM_STATUS_SUSPECT, 2, 2000);
-  swim_state_merge(&swim, &gossip);
+  swim_state_merge(swim, &gossip);
 
-  NodeState *found = swim_state_get_node(&swim, id);
-  EXPECT_NOT_NULL(found);
-  EXPECT_EQ_INT(found->info.incarnation, 2, "u");
-  EXPECT_EQ_INT(found->info.status, SWIM_STATUS_SUSPECT, "d");
-  EXPECT_EQ_INT((int)found->info.last_seen, 2000, "d");
-
-  swim_test_cleanup(&swim);
+  NodeState *found = swim_state_get_node(swim, id);
+  assert_non_null(found);
+  assert_int_equal(found->info.incarnation, 2);
+  assert_int_equal(found->info.status, SWIM_STATUS_SUSPECT);
+  assert_int_equal((int)found->info.last_seen, 2000);
 }
 
-static void test_merge_same_incarnation_newer_time(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_merge_same_incarnation_newer_time(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_ALIVE, 1, 1000);
-  swim_state_add(&swim, &info);
+  swim_state_add(swim, &info);
 
   NodeInfo gossip;
   make_node(&gossip, id, SWIM_STATUS_SUSPECT, 1, 2000);
-  swim_state_merge(&swim, &gossip);
+  swim_state_merge(swim, &gossip);
 
-  NodeState *found = swim_state_get_node(&swim, id);
-  EXPECT_NOT_NULL(found);
-  EXPECT_EQ_INT((int)found->info.last_seen, 2000, "d");
-  EXPECT_EQ_INT(found->info.status, SWIM_STATUS_SUSPECT, "d");
-
-  swim_test_cleanup(&swim);
+  NodeState *found = swim_state_get_node(swim, id);
+  assert_non_null(found);
+  assert_int_equal((int)found->info.last_seen, 2000);
+  assert_int_equal(found->info.status, SWIM_STATUS_SUSPECT);
 }
 
-static void test_merge_same_incarnation_older_time_ignored(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_merge_same_incarnation_older_time_ignored(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_ALIVE, 1, 2000);
-  swim_state_add(&swim, &info);
+  swim_state_add(swim, &info);
 
   NodeInfo gossip;
   make_node(&gossip, id, SWIM_STATUS_SUSPECT, 1, 1000);
-  swim_state_merge(&swim, &gossip);
+  swim_state_merge(swim, &gossip);
 
-  NodeState *found = swim_state_get_node(&swim, id);
-  EXPECT_NOT_NULL(found);
-  EXPECT_EQ_INT((int)found->info.last_seen, 1000, "d");
-  EXPECT_EQ_INT(found->info.status, SWIM_STATUS_SUSPECT, "d");
-
-  swim_test_cleanup(&swim);
+  NodeState *found = swim_state_get_node(swim, id);
+  assert_non_null(found);
+  assert_int_equal((int)found->info.last_seen, 1000);
+  assert_int_equal(found->info.status, SWIM_STATUS_SUSPECT);
 }
 
-static void test_merge_same_incarnation_alive_no_override_suspect(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_merge_same_incarnation_alive_no_override_suspect(
+    void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_SUSPECT, 1, 1000);
-  swim_state_add(&swim, &info);
+  swim_state_add(swim, &info);
 
   NodeInfo gossip;
   make_node(&gossip, id, SWIM_STATUS_ALIVE, 1, 2000);
-  swim_state_merge(&swim, &gossip);
+  swim_state_merge(swim, &gossip);
 
-  NodeState *found = swim_state_get_node(&swim, id);
-  EXPECT_NOT_NULL(found);
-  EXPECT_EQ_INT(found->info.status, SWIM_STATUS_SUSPECT, "d");
-  EXPECT_EQ_INT((int)found->info.last_seen, 1000, "d");
-
-  swim_test_cleanup(&swim);
+  NodeState *found = swim_state_get_node(swim, id);
+  assert_non_null(found);
+  assert_int_equal(found->info.status, SWIM_STATUS_SUSPECT);
+  assert_int_equal((int)found->info.last_seen, 1000);
 }
 
-static void test_merge_same_incarnation_same_status_newer_time(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_merge_same_incarnation_same_status_newer_time(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_ALIVE, 1, 1000);
-  swim_state_add(&swim, &info);
+  swim_state_add(swim, &info);
 
   NodeInfo gossip;
   make_node(&gossip, id, SWIM_STATUS_ALIVE, 1, 2000);
-  swim_state_merge(&swim, &gossip);
+  swim_state_merge(swim, &gossip);
 
-  NodeState *found = swim_state_get_node(&swim, id);
-  EXPECT_NOT_NULL(found);
-  EXPECT_EQ_INT(found->info.status, SWIM_STATUS_ALIVE, "d");
-  EXPECT_EQ_INT((int)found->info.last_seen, 2000, "d");
-
-  swim_test_cleanup(&swim);
+  NodeState *found = swim_state_get_node(swim, id);
+  assert_non_null(found);
+  assert_int_equal(found->info.status, SWIM_STATUS_ALIVE);
+  assert_int_equal((int)found->info.last_seen, 2000);
 }
 
-static void test_merge_stale_incarnation_ignored(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_merge_stale_incarnation_ignored(void **state) {
+  SWIM *swim = *state;
 
   uuid_t id;
   uuid_generate(id);
   NodeInfo info;
   make_node(&info, id, SWIM_STATUS_ALIVE, 5, 1000);
-  swim_state_add(&swim, &info);
+  swim_state_add(swim, &info);
 
   NodeInfo gossip;
   make_node(&gossip, id, SWIM_STATUS_SUSPECT, 3, 2000);
-  swim_state_merge(&swim, &gossip);
+  swim_state_merge(swim, &gossip);
 
-  NodeState *found = swim_state_get_node(&swim, id);
-  EXPECT_NOT_NULL(found);
-  EXPECT_EQ_INT(found->info.incarnation, 5, "u");
-  EXPECT_EQ_INT(found->info.status, SWIM_STATUS_ALIVE, "d");
-  EXPECT_EQ_INT((int)found->info.last_seen, 1000, "d");
-
-  swim_test_cleanup(&swim);
+  NodeState *found = swim_state_get_node(swim, id);
+  assert_non_null(found);
+  assert_int_equal(found->info.incarnation, 5);
+  assert_int_equal(found->info.status, SWIM_STATUS_ALIVE);
+  assert_int_equal((int)found->info.last_seen, 1000);
 }
 
-static void test_merge_self_ignored(void) {
-  SWIM swim;
-  swim_test_init(&swim);
+static void test_merge_self_ignored(void **state) {
+  SWIM *swim = *state;
 
   NodeInfo info;
-  make_node(&info, swim.uuid, SWIM_STATUS_ALIVE, 1, 1000);
-  swim_state_merge(&swim, &info);
+  make_node(&info, swim->uuid, SWIM_STATUS_ALIVE, 1, 1000);
+  swim_state_merge(swim, &info);
 
-  EXPECT_EQ_INT(swim.view_size, 0, "d");
-
-  swim_test_cleanup(&swim);
+  assert_int_equal(swim->view_size, 0);
 }
 
 int main(void) {
-  /* swim_state_add */
-  test_add_new_node();
-  test_add_multiple_sorted();
+  const struct CMUnitTest tests[] = {
+      /* swim_state_add */
+      cmocka_unit_test_setup_teardown(test_add_new_node, setup, teardown),
+      cmocka_unit_test_setup_teardown(
+          test_add_multiple_sorted, setup, teardown),
 
-  /* swim_state_del */
-  test_del_marks_dead();
-  test_del_self_ignored();
-  test_del_missing_returns_null();
+      /* swim_state_del */
+      cmocka_unit_test_setup_teardown(test_del_marks_dead, setup, teardown),
+      cmocka_unit_test_setup_teardown(test_del_self_ignored, setup, teardown),
+      cmocka_unit_test_setup_teardown(
+          test_del_missing_returns_null, setup, teardown),
 
-  /* swim_state_suspect */
-  test_suspect_sets_status();
-  test_suspect_records_witness();
+      /* swim_state_suspect */
+      cmocka_unit_test_setup_teardown(
+          test_suspect_sets_status, setup, teardown),
+      cmocka_unit_test_setup_teardown(
+          test_suspect_records_witness, setup, teardown),
 
-  /* swim_state_notice */
-  test_notice_alive_updates_time();
-  test_notice_suspect_to_alive();
-  test_notice_dead_ignored();
-  test_notice_higher_incarnation();
-  test_notice_stale_incarnation_ignored();
-  test_notice_missing_returns_null();
+      /* swim_state_notice */
+      cmocka_unit_test_setup_teardown(
+          test_notice_alive_updates_time, setup, teardown),
+      cmocka_unit_test_setup_teardown(
+          test_notice_suspect_to_alive, setup, teardown),
+      cmocka_unit_test_setup_teardown(
+          test_notice_dead_ignored, setup, teardown),
+      cmocka_unit_test_setup_teardown(
+          test_notice_higher_incarnation, setup, teardown),
+      cmocka_unit_test_setup_teardown(
+          test_notice_stale_incarnation_ignored, setup, teardown),
+      cmocka_unit_test_setup_teardown(
+          test_notice_missing_returns_null, setup, teardown),
 
-  /* swim_state_merge */
-  test_merge_new_node_added();
-  test_merge_higher_incarnation_updates();
-  test_merge_same_incarnation_newer_time();
-  test_merge_same_incarnation_older_time_ignored();
-  test_merge_same_incarnation_alive_no_override_suspect();
-  test_merge_same_incarnation_same_status_newer_time();
-  test_merge_stale_incarnation_ignored();
-  test_merge_self_ignored();
-
-  exit(exit_code);
+      /* swim_state_merge */
+      cmocka_unit_test_setup_teardown(
+          test_merge_new_node_added, setup, teardown),
+      cmocka_unit_test_setup_teardown(
+          test_merge_higher_incarnation_updates, setup, teardown),
+      cmocka_unit_test_setup_teardown(
+          test_merge_same_incarnation_newer_time, setup, teardown),
+      cmocka_unit_test_setup_teardown(
+          test_merge_same_incarnation_older_time_ignored, setup, teardown),
+      cmocka_unit_test_setup_teardown(
+          test_merge_same_incarnation_alive_no_override_suspect,
+          setup,
+          teardown),
+      cmocka_unit_test_setup_teardown(
+          test_merge_same_incarnation_same_status_newer_time, setup, teardown),
+      cmocka_unit_test_setup_teardown(
+          test_merge_stale_incarnation_ignored, setup, teardown),
+      cmocka_unit_test_setup_teardown(test_merge_self_ignored, setup, teardown),
+  };
+  return cmocka_run_group_tests(tests, NULL, NULL);
 }
