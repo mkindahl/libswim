@@ -8,6 +8,7 @@ project(
 set(CMAKE_DEBUG_POSTFIX d)
 
 find_library(UUID_LIBRARY NAMES uuid)
+find_package(cmocka)
 
 message(STATUS "UUID_LIBRARY: ${UUID_LIBRARY}")
 
