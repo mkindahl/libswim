@@ -15,6 +15,14 @@
 #include "swim/network.h"
 #include "swim/swim.h"
 
+#ifdef SWIM_TRACING
+#define SWIM_OPTSTRING "dvl:"
+#define SWIM_OPTUSAGE "[ -d ] "
+#else
+#define SWIM_OPTSTRING "vl:"
+#define SWIM_OPTUSAGE ""
+#endif
+
 #define STR(X) EXPAND(X)
 #define EXPAND(X) #X
 
@@ -22,7 +30,9 @@
  * Print usage and exit.
  */
 static void print_usage(const char *program_name) {
-  fprintf(stderr, "usage: %s [ -v ] [ -l PORT ] [ HOSTNAME [ PORT ] ]\n",
+  fprintf(stderr,
+          "usage: %s " SWIM_OPTUSAGE
+          " [ -v ] [ -l PORT ] [ HOSTNAME [ PORT ] ]\n",
           program_name);
   exit(EXIT_FAILURE);
 }
@@ -34,11 +44,13 @@ static SwimAddress parse_options(int argc, char *argv[]) {
   char *service = STR(SWIM_DEFAULT_PORTNO);
   char *hostname = NULL;
 
-  while ((opt = getopt(argc, argv, "dvl:")) != -1) {
+  while ((opt = getopt(argc, argv, SWIM_OPTSTRING)) != -1) {
     switch (opt) {
+#ifdef SWIM_TRACING
       case 'd':
         swim_tracing_on = true;
         break;
+#endif
       case 'v':
         swim_verbose = true;
         break;

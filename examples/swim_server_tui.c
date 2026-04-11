@@ -20,6 +20,14 @@
 #include "swim/swim.h"
 #include "swim/utils.h"
 
+#ifdef SWIM_TRACING
+#define SWIM_OPTSTRING "dvl:"
+#define SWIM_OPTUSAGE "[ -d ] "
+#else
+#define SWIM_OPTSTRING "vl:"
+#define SWIM_OPTUSAGE ""
+#endif
+
 #define STR(X) EXPAND(X)
 #define EXPAND(X) #X
 
@@ -77,7 +85,8 @@ static void render_log(void) {
   }
 
   for (int i = 0; i < count; i++) {
-    int idx = (log_head - log_count + start + i + LOG_RING_SIZE) % LOG_RING_SIZE;
+    int idx =
+        (log_head - log_count + start + i + LOG_RING_SIZE) % LOG_RING_SIZE;
     mvwprintw(log_win, 1 + i, 1, "%.*s", cols - 2, log_ring[idx]);
   }
 
@@ -109,11 +118,21 @@ static void tui_state_print(SWIM *s, void *userdata) {
   box(status_win, 0, 0);
   mvwprintw(status_win, 0, 2, " Nodes ");
 
-  mvwprintw(status_win, 1, 1, "Self: %s",
+  mvwprintw(status_win,
+            1,
+            1,
+            "Self: %s",
             swim_uuid_str_r(s->uuid, ubuf, sizeof(ubuf)));
 
-  mvwprintw(status_win, 2, 1, "%-36s %-19s %-8s %-21s %-21s",
-            "UUID", "LAST_SEEN", "STATUS", "ADDRESS", "WITNESS");
+  mvwprintw(status_win,
+            2,
+            1,
+            "%-36s %-19s %-8s %-21s %-21s",
+            "UUID",
+            "LAST_SEEN",
+            "STATUS",
+            "ADDRESS",
+            "WITNESS");
 
   for (int i = 0; i < s->view_size && i < rows - 4; i++) {
     NodeState *node = &s->view[i];
@@ -127,9 +146,10 @@ static void tui_state_print(SWIM *s, void *userdata) {
       timestr = tbuf;
     }
 
-    const char *address = swim_addr_str_r(
-        (struct sockaddr *)&node->info.addr, node->info.addrlen,
-        abuf, sizeof(abuf));
+    const char *address = swim_addr_str_r((struct sockaddr *)&node->info.addr,
+                                          node->info.addrlen,
+                                          abuf,
+                                          sizeof(abuf));
     if (!address)
       address = "";
 
@@ -137,9 +157,14 @@ static void tui_state_print(SWIM *s, void *userdata) {
     const char *witness = "";
     if (node->witness.addrlen > 0)
       witness = swim_addr_str_r((struct sockaddr *)&node->witness.addr,
-                                node->witness.addrlen, wbuf, sizeof(wbuf));
+                                node->witness.addrlen,
+                                wbuf,
+                                sizeof(wbuf));
 
-    mvwprintw(status_win, 3 + i, 1, "%-36s %-19s %-8s %-21s %-21s",
+    mvwprintw(status_win,
+              3 + i,
+              1,
+              "%-36s %-19s %-8s %-21s %-21s",
               swim_uuid_str_r(node->info.uuid, ubuf, sizeof(ubuf)),
               timestr,
               swim_status_name(node->info.status),
@@ -148,8 +173,7 @@ static void tui_state_print(SWIM *s, void *userdata) {
   }
 
   if (s->view_size >= rows - 4) {
-    mvwprintw(status_win, rows - 1, 1, "(%d more)",
-              s->view_size - (rows - 4));
+    mvwprintw(status_win, rows - 1, 1, "(%d more)", s->view_size - (rows - 4));
   }
 
   wrefresh(status_win);
@@ -171,7 +195,9 @@ static void handle_sigwinch(int sig) {
 
 static void print_usage(const char *program_name) {
   endwin();
-  fprintf(stderr, "usage: %s [ -v ] [ -l PORT ] [ HOSTNAME [ PORT ] ]\n",
+  fprintf(stderr,
+          "usage: %s " SWIM_OPTUSAGE
+          " [ -v ] [ -l PORT ] [ HOSTNAME [ PORT ] ]\n",
           program_name);
   exit(EXIT_FAILURE);
 }
@@ -183,11 +209,13 @@ static SwimAddress parse_options(int argc, char *argv[]) {
   char *service = STR(SWIM_DEFAULT_PORTNO);
   char *hostname = NULL;
 
-  while ((opt = getopt(argc, argv, "dvl:")) != -1) {
+  while ((opt = getopt(argc, argv, SWIM_OPTSTRING)) != -1) {
     switch (opt) {
+#ifdef SWIM_TRACING
       case 'd':
         swim_tracing_on = true;
         break;
+#endif
       case 'v':
         swim_verbose = true;
         break;

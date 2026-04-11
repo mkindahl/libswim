@@ -6,9 +6,6 @@
 
 #include "swim/config.h"
 
-#ifdef SWIM_TRACING
-
-extern bool swim_tracing_on;
 extern bool swim_verbose;
 
 typedef void (*swim_log_sink_fn)(const char *msg, void *userdata);
@@ -26,10 +23,20 @@ extern void swim_log_write(const char *fmt, ...);
     }                                                                \
   } while (0)
 
-#define TRACE(MSG, ...)                                      \
-  do {                                                       \
-    if (swim_tracing_on)                                     \
-      swim_log_write("%s: " MSG, __func__, ##__VA_ARGS__);   \
+#ifdef SWIM_TRACING
+
+extern bool swim_tracing_on;
+
+#define TRACE(MSG, ...)                                    \
+  do {                                                     \
+    if (swim_tracing_on)                                   \
+      swim_log_write("%s: " MSG, __func__, ##__VA_ARGS__); \
+  } while (0)
+
+#else
+
+#define TRACE(MSG, ...) \
+  do {                  \
   } while (0)
 
 #endif
