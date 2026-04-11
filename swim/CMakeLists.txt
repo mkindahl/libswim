@@ -24,12 +24,11 @@ set_target_properties(
              SOVERSION ${PROJECT_VERSION_MAJOR}
              POSITION_INDEPENDENT_CODE TRUE)
 
-add_executable(encoding_test encoding_test.c)
-target_link_libraries(encoding_test swim ${UUID_LIBRARY})
-
-add_test(NAME test_encoding COMMAND encoding_test)
-
 if(cmocka_FOUND)
+  add_executable(encoding_test encoding_test.c)
+  target_link_libraries(encoding_test swim ${UUID_LIBRARY} cmocka::cmocka)
+  add_test(NAME test_encoding COMMAND encoding_test)
+
   add_executable(state_test state_test.c)
   target_link_libraries(state_test swim ${UUID_LIBRARY} cmocka::cmocka)
   add_test(NAME test_state COMMAND state_test)
