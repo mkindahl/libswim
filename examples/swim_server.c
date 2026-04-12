@@ -55,7 +55,7 @@ static SwimAddress parse_options(int argc, char *argv[]) {
         swim_verbose = true;
         break;
       case 'l':
-        swim_listen_port = atoi(optarg);
+        swim_listen_port = strtol(optarg, NULL, 10);
         break;
       default:
         print_usage(argv[0]);
