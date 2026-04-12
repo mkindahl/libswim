@@ -48,6 +48,22 @@ To run the tests:
 ctest --test-dir build
 ```
 
+## Linting
+
+To run clang-tidy, configure with compile commands enabled and run the
+`tidy` target:
+
+```sh
+cmake -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake --build build --target tidy
+```
+
+To format all source files with clang-format:
+
+```sh
+cmake --build build --target format
+```
+
 [Consul]: https://www.consul.io/
 [Serf]: https://www.serf.io/
 [SWIM]: https://www.cs.cornell.edu/projects/Quicksilver/public_pdfs/SWIM.pdf

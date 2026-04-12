@@ -179,6 +179,7 @@ static void tui_state_print(SWIM *s, void *userdata) {
   wrefresh(status_win);
 }
 
+// NOLINTBEGIN(bugprone-signal-handler)
 static void handle_sigint(int sig) {
   (void)sig;
   swim_server_stop(&swim);
@@ -192,6 +193,7 @@ static void handle_sigwinch(int sig) {
   tui_state_print(&swim, NULL);
   render_log();
 }
+// NOLINTEND(bugprone-signal-handler)
 
 static void print_usage(const char *program_name) {
   endwin();
@@ -220,7 +222,7 @@ static SwimAddress parse_options(int argc, char *argv[]) {
         swim_verbose = true;
         break;
       case 'l':
-        swim_listen_port = atoi(optarg);
+        swim_listen_port = strtol(optarg, NULL, 10);
         break;
       default:
         print_usage(argv[0]);

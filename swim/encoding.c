@@ -73,7 +73,7 @@ ssize_t swim_encode_event_header(unsigned char* buf, size_t buflen,
 
   *plen = ptr - buf;
 
-  return *plen;
+  return (ssize_t)*plen;
 }
 
 ssize_t swim_decode_event_header(unsigned char* buf, size_t buflen,

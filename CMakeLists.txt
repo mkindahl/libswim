@@ -31,3 +31,11 @@ if(CLANG_FORMAT)
   file(GLOB_RECURSE ALL_SOURCE_FILES swim/*.c swim/*.h examples/*.c)
   add_custom_target(format COMMAND ${CLANG_FORMAT} -i ${ALL_SOURCE_FILES})
 endif()
+
+find_program(CLANG_TIDY clang-tidy)
+if(CLANG_TIDY)
+  file(GLOB TIDY_SOURCE_FILES swim/*.c examples/*.c)
+  list(FILTER TIDY_SOURCE_FILES EXCLUDE REGEX "_test\\.c$")
+  add_custom_target(tidy COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR}
+                                 ${TIDY_SOURCE_FILES})
+endif()
